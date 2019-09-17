@@ -1,0 +1,37 @@
+{
+  "name": "cr-back",
+  "version": "1.0.0",
+  "description": "This is the back end of out application, Cognitive Realm, A simple, though overcomplicated (For academic purposes), way to share files in your local network.",
+  "main": "server.js",
+  "bin": "server.js",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1",
+    "multer": "^1.4.1",
+    "request": "^2.88.0",
+    "sqlite3": "^4.0.9"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "Oropeza"
+  ],
+  "author": "MezzMar, Diomes",
+  "license": "ISC",
+  "pkg": {
+    "scripts": [
+      "lib/index.js",
+      "lib/sqlite3.js",
+      "lib/trace.js",
+      "lib/binding/*"
+    ],
+    "assets": [
+      "lib/binding/*",
+      "build/*",
+      "build/**/*"
+    ]
+  }
+}
