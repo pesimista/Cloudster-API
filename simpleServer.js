@@ -116,59 +116,112 @@ let books = [
 ] //Return
 
 
+/*----------------------------------------------------------*/
 /*--------------------Express Middleware--------------------*/
+/*----------------------------------------------------------*/
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
-app.use( (req, res, next) => {
-  let at = new Date();
-  let time = `${at.getHours()}:${at.getMinutes()}:${at.getMilliseconds()}`
-  console.log(`\n--------------Connection enabled with client--------------`);
-  console.log(req.headers['user-agent']);
-  console.log(req.ip.replace('::', '').replace(':', '\t'), "\tAt "+time);
-  next();
-});
-app.use( function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  next();
-});
-app.use(express.static(__dirname + _ ));
-/*--------------------Express Middleware--------------------*/
 
+
+app.use( 
+   /**
+    * Shows some not that relevant information about the incomming message
+    * @param {Object} req The Http Request
+    * @param {Object} res The Http Response
+    * @param {function} next Function to pass control to the next handler
+    */
+   (req, res, next) => {
+   const at = new Date();
+   const time = `${at.getHours()}:${at.getMinutes()}:${at.getMilliseconds()}`
+   console.log(`\n--------------Connection enabled with client--------------`);
+   console.log(req.headers['user-agent']);
+   console.log(req.ip.replace('::', '').replace(':', '\t'), "\tAt "+time);
+   next();
+} );
+
+
+/**
+ * Enables the server to receive request from anywhere
+ * @param {Object} req The Http Request
+ * @param {Object} res The Http Response
+ * @param {function} next Function to pass control to the next handler
+ */
+const CORS = (req, res, next) => {
+   res.header("Access-Control-Allow-Origin", "*");
+   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+   next();
+} ;
+app.use( CORS );
+app.use(express.static(__dirname + _ ));
+/*----------------------------------------------------------*/
+/*--------------------Express Middleware--------------------*/
+/*----------------------------------------------------------*/
+
+/**
+ * El Puerto;
+ */
 const port = process.env.PORT || 6969;
 
-app.get('/', (req, res) =>{
-   res.send(books);
-});
-
-app.get('/:id', (req, res) => {
-   if( Number.isInteger( parseInt(req.params.id) ) ){
-      let value = parseInt(req.params.id);
-      if(value < books.length)
-      {
-         res.send(books[value]);
-         return;
-      }
-   }
-   res.status('404').send(`Error : ${req.params.id} no es un ID valido`);
-})
-
-app.post('/books', (req, res) => {
-   let newData = req.body;
-   books.push(newData);
+app.get('/', 
+   /**
+    * Returns all the books in the record;
+    * @param {Object} req The Http Request
+    * @param {Object} res The Http Response
+    */
+   (req, res) =>{
    res.send(books);
 })
 
-app.listen(port, () => {
-   console.log('\n');
-   console.log(`Express Running on ${process.platform}`);
-   Object.keys(net).forEach(type => {
-      net[type].forEach( ip =>
-      {
-         if(ip.family === 'IPv4')
+
+app.get('/:id', 
+   /**
+    * Returns a book based on the id passed on the req.params.id;
+    * @param {Object} req The Http Request
+    * @param {Object} res The Http Response
+    */
+   (req, res) => {
+      if( Number.isInteger( parseInt(req.params.id) ) ){
+         let value = parseInt(req.params.id);
+         if(value < books.length)
          {
-         console.log(`${type}\t: ${ip.address}:${process.env.PORT || 6969}`)
+            res.send(books[value]);
+            return;
          }
-      })
-   });
-});
+      }
+      res.status('404').send({error_message : `Error : ${req.params.id} no es un ID valido`});
+   }
+);
+
+
+app.post('/', 
+   /**
+    * Post the book passed on the req.body into the record;
+    * @param {Object} req The Http Request
+    * @param {Object} res The Http Response
+    */
+   (req, res) => {
+      let newBook = req.body;
+      books.push(newBook);
+      res.send(books);
+   }
+);
+
+
+app.listen(port, 
+   /**
+    * Initializes the application and prints out the avalible IP routes and the used port;
+    */
+   () => {
+      console.log('\n');
+      console.log(`Express Running on ${process.platform}`);
+      Object.keys(net).forEach(type => {
+         net[type].forEach( ip =>
+         {
+            if(ip.family === 'IPv4')
+            {
+               console.log(`${type}\t: ${ip.address}:${process.env.PORT || 6969}`)
+            }
+         })
+      });
+   }
+);

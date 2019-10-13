@@ -18,7 +18,9 @@ const net = os.networkInterfaces();
 app.set('views', process.cwd());
 const _ = process.platform==='win32'? '\\' : '/';
 
+/*----------------------------------------------------------*/
 /*--------------------Express Middleware--------------------*/
+/*----------------------------------------------------------*/
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
 
@@ -44,7 +46,9 @@ app.use( function(req, res, next) {
   next();
 });
 app.use(express.static(__dirname + _ ));
+/*----------------------------------------------------------*/
 /*--------------------Express Middleware--------------------*/
+/*----------------------------------------------------------*/
 
 
 app.get('/api/dir', (req, res) =>{
@@ -64,8 +68,8 @@ app.get('/api/files', (req, res) => {
 });
 /*--------------------Deprecated--------------------*/
 
-//Sends the file perse - No download
-app.get('/api/files/:id', (req, res) => 
+/**/
+function getFilesById(req, res) 
 { 
   try{
     let file = ranger.getFile(req.params.id);
@@ -82,7 +86,8 @@ app.get('/api/files/:id', (req, res) =>
     res.status(404).send('Error in request');
     console.log('Error in request', e);
   }
-});
+};
+app.get('/api/files/:id', getFilesById);
 
 // Download file
 app.get('/api/download/:id', (req, res) => 
@@ -108,7 +113,7 @@ app.get('/api/download/:id', (req, res) =>
   }
 })
 
-// Get file ingo
+// Get file inFo
 app.get('/api/fileInfo/:id', (req, res) => {
   console.log(`GET /api/fileInfo/${req.params.id}`)
   let fileInfo = ranger.getFile(req.params.id);

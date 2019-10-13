@@ -88,5 +88,8 @@ typings/
 # DynamoDB Local files
 .dynamodb/
 
-
+#Things I'd rather not upload each time
 Folder/
+files.js
+Directorio.txt
+
