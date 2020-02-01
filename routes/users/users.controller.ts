@@ -227,6 +227,71 @@ const hashToken = (user: IUser, key: string): string => {
    }, 'supersecretkeythatnobodyisgonnaguess');
 }
 
+const changeUserData = (body: IUser, callback: Function) => {
+   conn.get(`select * from usuarios where id=${body.id}`, (err, row) => {
+      if (err) { console.log(err) }
+      if (typeof row === 'undefined') {
+         callback({
+            response: `El usuario ${body.id} no existe.`,
+         });
+         return;
+      }
+      else if (body.confirmpassword === row.password) {
+         conn.serialize(() => {
+            conn.run((body.usuario && body.usuario.length > 0) ? `update usuarios set nombre='${body.nombre}' where id=${body.id}` : '',
+               (e) => {
+                  if (!e) console.log("Updated usuario")
+               })
+               .run((body.nombre.length > 0) ? `update usuarios set nombre='${body.nombre}' where id=${body.id}` : '',
+                  (e) => {
+                     if (!e) console.log("Updated nombre")
+                  })
+               .run((body.password.length > 0) ? `update usuarios set password='${body.password}' where id=${body.id}` :
+                  '', (e) => {
+                     if (!e) console.log("Updated password")
+                  })
+               .run((body.respuesta1.length > 0) ? `update usuarios set pregunta1=${body.pregunta1} where id=${body.id}`
+                  : '', (e) => {
+                     if (!e) {
+                        console.log("Updated Pregunta1")
+                        conn.run(`update usuarios set respuesta1=${body.respuesta1} where id=${body.id}`)
+                        console.log("Updated Respuesta1")
+                     }
+                  })
+               .run((body.respuesta2.length > 0) ? `update usuarios set pregunta2=${body.pregunta2} where id=${body.id}`
+                  : '', (e) => {
+                     if (!e) {
+                        console.log("Updated Pregunta2")
+                        conn.run(`update usuarios set respuesta2=${body.respuesta2} where id=${body.id}`)
+                        console.log("Updated Respuesta2")
+                     }
+                  })
+               .get(`select * from usuarios where id=${body.id}`,
+                  (errGet, newRow) => {
+                     if (errGet) { console.log(errGet.message); }
+                     callback({
+                        response: `Grant access`,
+                        user: {
+                           id: newRow.id,
+                           nombre: newRow.nombre,
+                           nivel: newRow.nivel,
+                           desde: newRow.desde,
+                           usuario: newRow.usuario,
+                           pregunta1: newRow.pregunta1,
+                           pregunta2: newRow.pregunta2,
+                        }
+                     })
+                  })
+         }); //Serialize
+      }
+      else {
+         callback({
+            response: `La contraseña de confirmación no coincide con la actual.`,
+         });
+         return;
+      }
+   })
+}
 
 const hashPassword = (password: string) => {
    const iterations = 5;
