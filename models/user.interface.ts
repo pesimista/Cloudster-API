@@ -1,4 +1,5 @@
 export interface IUser {
+   id: string;
    usuario: string;
    nombre: string;
    apellido: string;
@@ -8,6 +9,8 @@ export interface IUser {
    pregunta2: string;
    respuesta2: string;
    desde: string;
-   nivel?: number;
-   intentos?: number;
+   nivel: number;
+   intentos: number;
+   confirmpassword?: string;
+   [key: string]: any;
 }

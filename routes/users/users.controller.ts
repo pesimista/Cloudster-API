@@ -39,7 +39,7 @@ export const login = (body: IUser, callback: Function): void => {
             if (!row) {
                callback({
                   status: 401,
-                  responseBody: `El usuario ${body.usuario} no existe.`
+                  responseBody: `Credenciales incorrectas.`
                });
                return;
             } else if (row.password !== body.password || row.intentos >= 3) {
@@ -50,7 +50,7 @@ export const login = (body: IUser, callback: Function): void => {
                            status: 401,
                            responseBody: ++row.intentos >= 3 ?
                               `Bloqueado por multiples intentos fallidos` :
-                              `Contraseña incorrecta!`,
+                              `Credenciales incorrectas.`,
                         });
                         return;
                      }
@@ -117,7 +117,7 @@ export const register = (body: IUser, callback: Function): void => {
    } else if (!body.password) {
       callback({
          status: 400,
-         responseBody: `Falta contraseña!`
+         responseBody: `Falta contraseña`
       });
       return;
    } else if (!body.pregunta1 || !body.pregunta2) {
@@ -160,7 +160,7 @@ export const register = (body: IUser, callback: Function): void => {
 
          conn.serialize(() => {
             console.log("serialize");
-            conn.run(`insert into usuarios(
+            conn.run(`INSERT INTO usuarios(
                \`nombre\`
                ,\`password\`
                ,\`desde\`
@@ -171,7 +171,7 @@ export const register = (body: IUser, callback: Function): void => {
                ,\`respuesta2\`
                ,\`nivel\`
                ,\`key\`
-            ) values(
+            ) VALUES(
                "${body.nombre}",
                "${body.password}",
                date(),
@@ -200,7 +200,7 @@ export const register = (body: IUser, callback: Function): void => {
                   //    accion: 'register'
                   // });
                   callback({
-                     status: 500,
+                     status: 200,
                      responseBody: {
                         response: `Grant access`,
                         user: hashToken(row, key)
@@ -212,85 +212,122 @@ export const register = (body: IUser, callback: Function): void => {
    );//Select * from usuarios
 }
 
+export const updateUserData = (body: IUser, callback: Function): void => {
+   conn.get(`SELECT * FROM usuarios WHERE id=${body.id}`, (err: Error, row: IUser) => {
+      if (err) { console.log(err) }
+      if (!row) {
+         callback(
+            {
+               status: 400,
+               responseBody: `El usuario no existe.`
+            });
+         return;
+      }
+      else if (body.confirmpassword !== row.password) {
+         callback({
+            status: 400,
+            responseBody: `La contraseña de confirmación no coincide con la actual.`,
+         });
+         return;
+      }
+
+      let query: string = 'UPDATE usuarios SET ';
+      /**
+       * Loop to add all the fields in the database
+       */
+      Object.keys(body).forEach(
+         (key: string) => {
+            if (!key.includes('id') && body[key]) {
+               query += ` ${key}='${body[key]}',`;
+            }
+         }
+      );
+
+      query = query.slice(0, -1);
+      query += ` WHERE id=${body.id};`
+
+      conn.serialize(() => {
+         conn
+            .run(query)
+            .get(`SELECT * FROM usuarios WHERE id=${body.id}`,
+               (errGet, updatedValues) => {
+                  if (errGet) {
+                     callback({ status: 500, responseBody: errGet.message });
+                     return;
+                  }
+                  callback({
+                     status: 200,
+                     responseBody: { response: `Usuario actualizado`, user: hashToken(updatedValues) }
+                  });//send response
+               }//get callback
+            )//conn get
+      });//serialize
+   })//initial get
+}//updateUserData
+
+export const getUsers = (callback: Function, id: string = ''): void => {
+   const exe = id ? conn.get : conn.all;
+   const query = `SELECT 
+      \`id\`,
+      \`usuario\`,
+      \`nombre\`,
+      \`desde\`,
+      \`pregunta1\`,
+      \`pregunta2\`,
+      \`respuesta1\`,
+      \`respuesta2\`,
+      \`nivel\` 
+   FROM usuarios`;
+
+   const where = id ? ` WHERE id=${id};` : ';';
+   exe(query + where, (error: Error, row: IUser) => {
+      callback({
+         status: error ? 500 : 200,
+         responseBody: row
+      });
+   });
+}
+
+export const getUserQuestions = (id: string, callback: Function, ) => {
+   const query = `SELECT 
+      \`usuario\`,
+      \`pregunta\`
+   FROM 
+      \`usuarios\`
+   INNER JOIN 
+      \`preguntas\`
+   ON 
+      \`preguntas\`.\`id\`=\`usuarios\`.\`pregunta1\`
+   OR 
+      \`preguntas\`.\`id\`=\`usuarios\`.\`pregunta2\`
+   WHERE 
+      \`usuarios\`.\`id\`=${id};`;
+
+   conn.all(query, (error: Error, rows: any[]) => {
+      callback({
+         status: error ? 500 : 200,
+         responseBody: {
+            usuario: rows[0].usuario,
+            pregunta1: rows[0].pregunta,
+            pregunta2: rows[1].pregunta
+         }
+      })
+   });//all
+}
+
 /**
  * Creates a jwt based on an user info
  */
-const hashToken = (user: IUser, key: string): string => {
+const hashToken = (user: IUser, key?: string): string => {
    const now = new Date();
    return jwt.sign({
       id: user.id,
       nombre: user.nombre,
       nivel: user.nivel,
       usuario: user.usuario,
-      key: key,
+      key: key || user.key,
       expires: now.setHours(now.getHours() + 1)
    }, 'supersecretkeythatnobodyisgonnaguess');
-}
-
-const changeUserData = (body: IUser, callback: Function) => {
-   conn.get(`select * from usuarios where id=${body.id}`, (err, row) => {
-      if (err) { console.log(err) }
-      if (typeof row === 'undefined') {
-         callback({
-            response: `El usuario ${body.id} no existe.`,
-         });
-         return;
-      }
-      else if (body.confirmpassword === row.password) {
-         conn.serialize(() => {
-            conn.run((body.usuario && body.usuario.length > 0) ? `update usuarios set nombre='${body.nombre}' where id=${body.id}` : '',
-               (e) => {
-                  if (!e) console.log("Updated usuario")
-               })
-               .run((body.nombre.length > 0) ? `update usuarios set nombre='${body.nombre}' where id=${body.id}` : '',
-                  (e) => {
-                     if (!e) console.log("Updated nombre")
-                  })
-               .run((body.password.length > 0) ? `update usuarios set password='${body.password}' where id=${body.id}` :
-                  '', (e) => {
-                     if (!e) console.log("Updated password")
-                  })
-               .run((body.respuesta1.length > 0) ? `update usuarios set pregunta1=${body.pregunta1} where id=${body.id}`
-                  : '', (e) => {
-                     if (!e) {
-                        console.log("Updated Pregunta1")
-                        conn.run(`update usuarios set respuesta1=${body.respuesta1} where id=${body.id}`)
-                        console.log("Updated Respuesta1")
-                     }
-                  })
-               .run((body.respuesta2.length > 0) ? `update usuarios set pregunta2=${body.pregunta2} where id=${body.id}`
-                  : '', (e) => {
-                     if (!e) {
-                        console.log("Updated Pregunta2")
-                        conn.run(`update usuarios set respuesta2=${body.respuesta2} where id=${body.id}`)
-                        console.log("Updated Respuesta2")
-                     }
-                  })
-               .get(`select * from usuarios where id=${body.id}`,
-                  (errGet, newRow) => {
-                     if (errGet) { console.log(errGet.message); }
-                     callback({
-                        response: `Grant access`,
-                        user: {
-                           id: newRow.id,
-                           nombre: newRow.nombre,
-                           nivel: newRow.nivel,
-                           desde: newRow.desde,
-                           usuario: newRow.usuario,
-                           pregunta1: newRow.pregunta1,
-                           pregunta2: newRow.pregunta2,
-                        }
-                     })
-                  })
-         }); //Serialize
-      }
-      else {
-         callback({
-            response: `La contraseña de confirmación no coincide con la actual.`,
-         });
-         return;
-      }
-   })
 }
 
 const hashPassword = (password: string) => {
