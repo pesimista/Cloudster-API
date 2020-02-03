@@ -315,6 +315,16 @@ export const getUserQuestions = (id: string, callback: Function, ) => {
    });//all
 }
 
+export const getQuestions = (callback: Function) => {
+   const query = `SELECT pregunta FROM preguntas`
+   conn.all(query, (error: Error, rows: string[]) => {
+      callback({
+         status: error ? 500 : 200,
+         responseBody: rows
+      });
+   });
+}
+
 /**
  * Creates a jwt based on an user info
  */
