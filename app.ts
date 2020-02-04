@@ -5,8 +5,8 @@ import logger from "morgan";
 const multer = require("multer");
 
 import indexRouter from "./routes/index.route";
-import usersRouter from "./routes/users/users.route";
-import filesRouter from "./routes/files/ranger.route";
+import usersRouter from "./routes/users/usersRoute";
+import filesRouter from "./routes/files/rangerRoute";
 
 /**
  * Instantiate app
@@ -25,7 +25,7 @@ app.use(express.urlencoded({ extended: false }));
 
 /**
  * Cross Origin Requests Service 
- */ 
+ */
 app.use((req: Request, res: Response, next: NextFunction) => {
    res.header('Access-Control-Allow-Origin', '*');
    res.header('Access-Control-Allow-Headers', '*');
@@ -42,14 +42,17 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 /**
  * Routes
  */
+/* Usuarios */
+app.use('/api/users', usersRouter);
+/* Archivos */
+app.use('/api/files', filesRouter);
+app.use('/api', indexRouter);
 app.use('/', (req: Request, res: Response, next: NextFunction) => {
    res.send("AYUDAMEDIOS")
 })
-app.use('/api/', indexRouter);
-/* Archivos */
-app.use('/api/files', filesRouter);
-/* Usuarios */
-app.use('/api/users', usersRouter);
+app.use('/*', (req, res) => {
+   res.status(404).send();
+})
 
 // // catch 404 and forward to error handler
 // app.use((req: Request, res: Response, next: NextFunction) => {
