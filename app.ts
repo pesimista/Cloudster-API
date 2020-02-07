@@ -32,6 +32,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
    console.log(`\n${getColor(req.method)}\t\x1b[36m'${req.originalUrl}'\x1b[0m\t `)
 
+   /* Pa que no aparezca en gris el req >///< */
    if (req.method === 'OPTIONS') {
       res.header('Access-Control-Allow-Methods', '*');
       return res.json({});

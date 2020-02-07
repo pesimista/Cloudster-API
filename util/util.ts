@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import sqlite from "sqlite3";
+import sqlite from 'sqlite3';
 import { IUser } from "../models/user";
 
 const sqlite3 = sqlite.verbose();
@@ -10,7 +10,7 @@ export const conn = new sqlite3.Database('./cloudster.db', (err: Error | null) =
       console.log("Error");
    }
    else {
-      console.log('Connected Successfully to the DatabasE');
+      console.log(randomUpper('cONNeCTed suCcESsfUlLy To tHe DatABasE'));
    }
 });
 export const Authorization = (req: Request, res: Response, next: NextFunction) => {
@@ -35,3 +35,18 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
       });
 
 }
+/**
+* Nada, pone letras mayusculas de forma aleatoria en las palaras
+* @param value la frase
+*/
+export const randomUpper = (value: string): string => {
+   value = value.trim();
+   let toReturn = "";
+   [...value].forEach((item, index) => {
+      if (Math.random() >= 0.40)
+         toReturn += item.toLowerCase();
+      else toReturn += item.toUpperCase();
+   })
+
+   return toReturn;
+};

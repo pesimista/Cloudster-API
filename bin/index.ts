@@ -5,13 +5,13 @@
  */
 
 import app from "../app";
+import { cwd, setDirectory } from "../routes/files/rangerController";
 var debug = require('debug')('cloudster:server');
 var http = require('http');
 
 /**
  * Get port from environment and store in Express.
  */
-
 var port = normalizePort(process.env.PORT || '3000');
 app.set('port', port);
 
@@ -76,6 +76,8 @@ function onError(error: any) {
          throw error;
    }
 }
+
+setDirectory(__dirname);
 
 /**
  * Event listener for HTTP server "listening" event.

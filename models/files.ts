@@ -1,17 +1,17 @@
 export interface IFile {
    id?: number;
-   ino: number;
+   ino: string;
    name: string;
    url?: string;
    ext: string;
    isFile: boolean;
    lastModified?: Date;
    lastChanged?: Date;
-   LastAccessed?: Date;
+   lastAccessed?: Date;
    birthtime: Date;
    fullSize: number;
    size: string;
-   dependency: number;
+   dependency: string;
    nivel: number;
 }
 
@@ -27,4 +27,22 @@ export interface IFile {
    size: parseSize(stat.size),
    dependency: dep,
    nivel: nivel
+
+
+   CREATE TABLE archivos (
+      id int NULL,
+      ino int not NULL,
+      name varchar(255),
+      ext varchar(10),
+      isFile integer DEFAULT 1,
+      lastModified datetime,
+      lastChanged datetime,
+      lastAccessed datetime,
+      birthtime datetime,
+      fullSize int,
+      size varchar(12),
+      dependency int NULL,
+      nivel int DEFAULT 1
+   );
+
  */
