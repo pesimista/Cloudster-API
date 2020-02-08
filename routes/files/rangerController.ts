@@ -1,7 +1,9 @@
+import { Request, Response } from "express";
 import fs, { PathLike, Dirent } from "fs";
 import path from "path";
 import { IFile } from "../../models/files";
-import { conn } from "../../util/util";
+import { conn, connSync, getTokenKey } from "../../util/util";
+import { IUser } from "../../models/user";
 
 const _ = (process.platform === 'win32' ? '\\' : '/');
 export let cwd: string;
@@ -72,27 +74,30 @@ export const initializeServer = (): void => {
 
    /* The files that are currently active in the folder */
    const files = loadFiles('', cwd, 1);
-   conn.each(`SELECT ino from archivos`, (err: Error, rowIno: {ino:number}) => {
+   conn.each(`SELECT ino from archivos`, (err: Error, rowIno: { ino: number }) => {
       const selected = files.find(
          f => f.ino.trim() === rowIno.ino.toString().trim()
       )
       if (!selected) {
          console.log(selected);
-         conn.run(`DELETE FROM archivos WHERE ino=? COLLATE NOCASE`, rowIno,
-            (e) => console.log('\x1b[31mDeleted\x1b[36m ' + (e ? e.message : rowIno))
+         conn.run(`
+         DELETE FROM archivos WHERE ino=? COLLATE NOCASE`
+            , rowIno.ino,
+            (e) => console.log('\x1b[31mDelete\x1b[36m ' + (e ? e.message : rowIno.ino))
          );
          return;
       }
 
-
-      conn.run(`UPDATE archivos SET
+      conn.run(`
+      UPDATE archivos SET
          name = '${selected.name}'
          , ext = '${selected.ext}'
          , isFile = ${selected.isFile ? 1 : 0}
-         , fullSize = ${(selected.fullSize)}
+         , fullSize = ${selected.fullSize}
          , size = '${selected.size}'
-      WHERE ino = ? COLLATE NOCASE`, rowIno,
-         (e) => console.log('\x1b[34mUpdate\x1b[36m ' + (e ? e.message : rowIno))
+      WHERE ino = ? COLLATE NOCASE`
+         , rowIno.ino
+         , (e) => console.log('\x1b[34mUpdate\x1b[36m ' + (e ? e.message : rowIno.ino))
       );
 
    });
@@ -102,7 +107,8 @@ export const initializeServer = (): void => {
 }
 
 /**
- * Checks if all the files currently located on the initial path are avalible in the database
+ * Checks if all the files currently located on the 
+ * initial path are avalible in the database
  * @param error the error that might occur during query execution
  * @param rows the retrieved rows by the query
  * @param files the file list that will be used as reference
@@ -139,10 +145,11 @@ const checkFiles = (error: Error, rows: IFile[], files: IFile[]): void => {
                   , '${file.birthtime}'
                   , ${file.fullSize}
                   , '${file.size}'
-                  , ${file.dependency}
+                  , ${file.dependency || 0}
                   , ${file.nivel}
                );`;
             // console.log(query)
+            console.log("------------------------------")
             conn.run(query, (e) => console.log('\x1b[33mINSERT\x1b[36m ' + (e ? e.message : file.ino)));
          }
       }
@@ -196,23 +203,26 @@ export const parseDependency = (file: IFile): string => {
  * Looks for a specific file inside the database
  * @param ino the file's unique identifier
  */
-export const findFile = (ino: string | number): IFile => {
-   let file;
-   conn.get(`SELECT * FROM archivos WHERE ino=?`, ino, (error: Error, row: IFile) => {
-      if (error || !row) file = {};
-      else file = row;
-   });
-
-   while (!file) {
-      /* Wait for the file to be found ¯\_(ツ)_/¯ */
-   }
+export const findFile = (ino: string | number = 0): IFile => {
+   //    /* Wait for the file to be found ¯\_(ツ)_/¯ */
+   let [file] = connSync.run(
+      `SELECT * FROM archivos WHERE ino=?`
+      , [ino]
+   );
 
    return file;
 }
+
+/**
+ * Sets the new directory cloudster will be working with
+ * @param dir the new directory
+ */
 export const setDirectory = (dir: string): boolean => {
    console.log(dir);
    cwd = dir;
+   console.log("UPDATING")
    initializeServer();
+
    return true;
    // try {
    //    fs.accessSync(dir);
@@ -243,6 +253,99 @@ export const setDirectory = (dir: string): boolean => {
    //       process.exit();
    //    }
    // }
+}
+
+/**
+ * Verifies that the user indeed has permission to access the file he requested
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
+const verifyPermission = (req: Request, res: Response): any[] => {
+   const { key } = getTokenKey(req.header('Authorization'));
+   const [{ nivel }] = connSync
+      .run(
+         `SELECT nivel FROM usuarios WHERE key=? COLLATE NOCASE`
+         , [key]
+      );
+
+   console.log(req.params.ino);
+   if (!req.params.ino) return [nivel, { ino: 0 }]
+
+   const file = findFile(req.params.ino);
+   if (!file) {
+      res.status(404).send();
+      return [-1, {}];
+   };
+   if (file.nivel > nivel) {
+      res.status(401).json({ message: `No tiene acceso a este archivo` });
+      return [-1, {}];
+   }
+   return [nivel, file];
+}
+
+/**
+ * Retrieves all the files inside a folder, excluding all of those which level
+ * is higher than the user's
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
+export const getFilesInDirectory = (req: Request, res: Response): void => {
+   const [nivel, file] = verifyPermission(req, res);
+   if (nivel === -1)
+      return;
+
+   console.log([nivel, file]);
+
+   const files = connSync
+      .run(
+         `SELECT * FROM archivos WHERE dependency=? AND nivel<=? COLLATE NOCASE`
+         , [file.ino, nivel]
+      );
+
+
+   res.status(200).json(files);
+}
+
+/**
+ * Retrieves the info for a spefic file
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
+export const getFileInfo = (req: Request, res: Response): void => {
+   const [nivel, file] = verifyPermission(req, res);
+   if (nivel === -1)
+      return;
+
+   res.status(200).json(file);
+}
+
+/**
+ * 
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
+export const postFile = (req: Request, res: Response): void => {
+   const where = parseInt(req.params.ino);
+   if (isNaN(where)) {
+      res.status(400).send({ message: 'El ino no es compatible' });
+      return;
+   };
+   cwd;
+   try {
+      fs.accessSync(req.file.path);
+      fs.renameSync(req.file.path, cwd + _ + req.file.originalname);
+   } catch (e) {
+      if (e && e.message.includes('cross-device link not permitted')) {
+         let is = fs.createReadStream(req.file.path);
+         let os = fs.createWriteStream(cwd + _ + req.file.originalname);
+         is.pipe(os);
+         is.on('end', () => {
+            fs.unlinkSync(req.file.path);
+            res.status(200).json({ message: "Recibido" });
+         });
+      }
+      else res.status(500).json({ message: e.message });
+   }
 }
 
 

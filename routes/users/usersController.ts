@@ -57,7 +57,7 @@ export const login = (req: Request, res: Response): void => {
                /* Unathorized */
                res.status(401).json({ message: `Credenciales incorrectas` });
                return;
-            } else if (row.password !== body.password || row.intentos >= 3) {
+            } else if (row.password.trim() !== body.password.trim() || row.intentos >= 3) {
                conn.serialize(() => {
                   conn.run(`UPDATE usuarios 
                      SET 
@@ -243,12 +243,12 @@ export const updateUserData = (req: Request, res: Response): void => {
          }
       );
 
-      query += `intentos=0 WHERE id='${body.id}' COLLATE NOCASE;`
+      query += `intentos=0 WHERE id='${req.params.id}' COLLATE NOCASE;`
 
       conn.serialize(() => {
          conn
             .run(query)
-            .get(`SELECT * FROM usuarios WHERE id='${body.id}' COLLATE NOCASE;`,
+            .get(`SELECT * FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`,
                (errGet: any, updatedValues: IUser) => {
                   if (errGet) {
                      res.status(500).json({ name: errGet.code, message: errGet.message });

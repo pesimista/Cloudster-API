@@ -3,8 +3,10 @@ import jwt from "jsonwebtoken";
 import sqlite from 'sqlite3';
 import { IUser } from "../models/user";
 
+
 const sqlite3 = sqlite.verbose();
 
+export const connSync = require("sqlite-sync").connect('./cloudster.db');
 export const conn = new sqlite3.Database('./cloudster.db', (err: Error | null) => {
    if (err) {
       console.log("Error");
@@ -13,19 +15,20 @@ export const conn = new sqlite3.Database('./cloudster.db', (err: Error | null) =
       console.log(randomUpper('cONNeCTed suCcESsfUlLy To tHe DatABasE'));
    }
 });
+
 export const Authorization = (req: Request, res: Response, next: NextFunction) => {
    const token = req.header('Authorization');
    if (!token || !token.startsWith('bearer ')) {
       res.status(401).send();
       return;
    }
-   const decoded = jwt.decode(token.replace('bearer ', '')) as unknown as IUser;
+   const decoded = getTokenKey(token);
    if (!decoded.key) {
       res.status(401).send();
       return;
    }
 
-   conn.get(`SELECT '' FROM usuarios WHERE key='${decoded.key.trim()}'`,
+   conn.get(`SELECT '' FROM usuarios WHERE key='${decoded.key.trim()}' COLLATE NOCASE`,
       (error: any, row) => {
          if (error || !row) {
             res.status(401).json({ message: 'Unanthorized' });
@@ -35,6 +38,11 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
       });
 
 }
+
+export const getTokenKey = (token: string = ''): IUser => {
+   return jwt.decode(token.replace('bearer ', '')) as unknown as IUser;
+}
+
 /**
 * Nada, pone letras mayusculas de forma aleatoria en las palaras
 * @param value la frase
