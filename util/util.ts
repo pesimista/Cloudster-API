@@ -15,7 +15,13 @@ export const conn = new sqlite3.Database('./cloudster.db', (err: Error | null) =
       console.log(randomUpper('cONNeCTed suCcESsfUlLy To tHe DatABasE'));
    }
 });
-
+/**
+ * Express Middleware to validate that the key sent by the client has a 
+ * key that corresponds to the user
+ * @param req The incoming request
+ * @param res The outgoing response
+ * @param next The function to be called after the authorization is validated
+ */
 export const Authorization = (req: Request, res: Response, next: NextFunction) => {
    const token = req.header('Authorization');
    if (!token || !token.startsWith('bearer ')) {
@@ -29,12 +35,12 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
       return res.status(500).json({ message: error.message });
    }
 
-   if (!decoded.key) {
+   if (!decoded.key || !decoded.id) {
       res.status(401).send();
       return;
    }
 
-   conn.get(`SELECT '' FROM usuarios WHERE key='${decoded.key.trim()}' COLLATE NOCASE`,
+   conn.get(`SELECT '' FROM usuarios WHERE id=${decoded.id.trim()} AND key='${decoded.key.trim()}' COLLATE NOCASE`,
       (error: any, row) => {
          if (error || !row) {
             res.status(401).json({ message: 'Unanthorized' });

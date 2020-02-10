@@ -8,14 +8,9 @@ import indexRouter from "./routes/index.route";
 import usersRouter from "./routes/users/usersRoute";
 import filesRouter from "./routes/files/rangerRoute";
 
-/**
- * Instantiate app
- */
-var app: Application = express();
+/* Instantiate app */
+const app: Application = express();
 
-// view engine setup
-// app.set('views', path.join(__dirname, 'views'));
-// app.set('view engine', 'jade');
 
 app.use(logger('dev'));
 app.use(express.json());

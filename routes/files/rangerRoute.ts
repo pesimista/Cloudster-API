@@ -14,10 +14,10 @@ ranger.get('/:ino', Authorization, getFileInfo);
 ranger.get('/:ino/files', Authorization, getFilesInDirectory);
 
 /* POST a file */
-ranger.post('/:ino', upload.single('file'), postFile);
+ranger.post('/:ino', Authorization, upload.single('file'), postFile);
 
 /* PUT a file */
-ranger.put('/:ino', putFile);
+ranger.put('/:ino', Authorization, putFile);
 
 // ranger.get('/:id', Authorization, getUsers);
 // ranger.get('/:usuario/questions', getUserQuestions);

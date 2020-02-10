@@ -4,9 +4,11 @@ import path from "path";
 import { IFile } from "../../models/files";
 import { conn, connSync, getTokenKey } from "../../util/util";
 
+/* The saparator */
 const _ = (process.platform === 'win32' ? '\\' : '/');
 /* Defines whether or not the data base is being updated */
 export let updating: boolean = false;
+/* The directory to work with */
 export let cwd: string;
 /* files to exclude */
 const exclude: string[] = [
@@ -16,68 +18,8 @@ const exclude: string[] = [
    'ranger.json'
 ];
 
-const generateFile = (fileName: string, dir: string, dep: string | number, nivel: number = 1): IFile => {
-   let stat;
-   try {
-      stat = fs.statSync(dir + _ + fileName);
-   } catch (e) {
-      console.log(`no such file or directory, stat ${dir + _ + fileName}`);
-      return <IFile>{};
-   }
-
-   /* Nivel de acceso  de la carpeta contenedora */
-   if (nivel === -1) {
-      const deplvl = findFile(+dep);
-      if (deplvl && nivel < deplvl.nivel)
-         nivel = deplvl.nivel;
-      else nivel = 1;
-   }
-
-   const ext = stat.isDirectory() ? '' :
-      path.parse(fileName).ext === '' ?
-         '~' : path.parse(fileName).ext.substring(1);
-   const file: IFile = {
-      ino: stat.ino.toString(),
-      name: fileName,
-      ext: ext,
-      isFile: stat.isFile(),
-      available: true,
-      birthtime: stat.birthtime,
-      fullSize: stat.size,
-      size: parseSize(stat.size),
-      dependency: dep.toString(),
-      nivel: nivel
-   };
-
-   return file;
-}
-
-const loadFiles = (dir: PathLike, dep: string = '0', nivel: number = 1): IFile[] => {
-   let files: IFile[] = [], unprocessedFiles: Dirent[];
-   try {
-      unprocessedFiles = fs.readdirSync(dir, { withFileTypes: true });
-   }
-   catch (err) {
-      console.log(`no such file or directory, readdir ${dir}`);
-      // return { status: 500, response: { ...err, message: 'readdirSync: ' + err.message } };
-      return [];
-   }
-   unprocessedFiles.forEach((dirent: Dirent) => {
-      if (exclude.includes(dirent.name)) return;
-
-      const file = generateFile(dirent.name, dir.toString(), dep, nivel);
-      files.push(file);
-
-      if (!file.isFile) {
-         const dependedFiles = loadFiles(dir + _ + dirent.name, file.ino, file.nivel);
-         files = files.concat(dependedFiles);
-      }
-   });
-   return files;
-}
-
 /**
- * Verifies all the files cloudster will manage
+ * Verifies the integrity of all the files cloudster will manage
  */
 export const initializeServer = (): void => {
 
@@ -85,17 +27,17 @@ export const initializeServer = (): void => {
    updating = true;
 
    /* The files that are currently active in the folder */
-   // const files = loadFiles('', cwd, 0);
    const files = loadFiles(cwd);
    conn.each(`SELECT ino from archivos`, (err: Error, rowIno: { ino: number }) => {
       const selected = files.find(
          f => f.ino.trim() === rowIno.ino.toString().trim()
       )
+      /* If the file doesn't exist in the current folder, marks it as unavailable */
       if (!selected) {
          deleteFile(rowIno.ino);
          return;
       }
-
+      /* If it is, the data gets updated*/
       conn.run(`
       UPDATE archivos SET
          name = '${selected.name}'
@@ -140,52 +82,85 @@ const checkFiles = (error: Error, rows: IFile[], files: IFile[]): void => {
 }
 
 /**
- * It doesn't actually remove the file from the server, 
- * it just marks it as unavailable
- * @param ino 
+ * Reads all the files and folders recursively in order to have
+ * a temporal log of all the data inside the server
+ * @param dir The directory the file is in
+ * @param dep The ino corresponding to the directory
+ * @param nivel The Hierarchy to be assign to the file
  */
-const deleteFile = (ino: string | number): void => {
-   console.log(ino);
-   conn.run(`
-       UPDATE archivos SET
-         available = 0
-      WHERE ino = ${+ino} COLLATE NOCASE`,
-      (e) => console.log('\x1b[31mDelete\x1b[36m ' + (e ? e.message : ino))
-   );
-   conn.all(`SELECT ino FROM archivos WHERE dependency=? COLLATE NOCASE`
-      , [+ino]
-      , (err, rows: IFile) => deleteFile(rows.ino)
-   );
+const loadFiles = (dir: PathLike, dep: string = '0', nivel: number = 1): IFile[] => {
+   let files: IFile[] = [], unprocessedFiles: Dirent[];
+   try {
+      unprocessedFiles = fs.readdirSync(dir, { withFileTypes: true });
+   }
+   catch (err) {
+      console.log(`no such file or directory, readdir ${dir}`);
+      // return { status: 500, response: { ...err, message: 'readdirSync: ' + err.message } };
+      return [];
+   }
+   unprocessedFiles.forEach((dirent: Dirent) => {
+      if (exclude.includes(dirent.name)) return;
+
+      const file = generateFile(dirent.name, dir.toString(), dep, nivel);
+      files.push(file);
+
+      if (!file.isFile) {
+         const dependedFiles = loadFiles(dir + _ + dirent.name, file.ino, file.nivel);
+         files = files.concat(dependedFiles);
+      }
+   });
+   return files;
 }
 
 /**
- * It doesn't actually remove the file from the server,
- * it just marks it as unavailable
- * @param ino
+ * Generates the structure of a file according to the stat
+ * Returns a IFile object
+ * @param fileName The name of the file to be generated
+ * @param dir The directory where the file is held
+ * @param dep The ino corresponding to the directory
+ * @param nivel The Hierarchy to be assign to the file
  */
-const deleteFileSync = (ino: string | number): boolean => {
+const generateFile = (fileName: string, dir: string, dep: string | number, nivel: number = 1): IFile => {
+   let stat;
    try {
-      connSync.run(`
-       UPDATE archivos SET
-         available = 0
-      WHERE ino = ? COLLATE NOCASE`
-         , [+ino]
-      );
-      const dep: IFile[] = connSync.run(`
-         SELECT ino FROM archivos WHERE dependency=? COLLATE NOCASE`
-         , [+ino]
-      );
-
-      console.log('\x1b[31mDelete \x1b[36mSYNC \x1b[0m ' + ino)
-      dep.forEach(file => {
-         deleteFileSync(file.ino);
-      });
-      return true;
+      stat = fs.statSync(dir + _ + fileName);
    } catch (e) {
-      console.log('\x1b[31mDelete \x1b[36mSYNC \x1b[0m ' + (e ? e.message : ino))
-      return false;
+      console.log(`no such file or directory, stat ${dir + _ + fileName}`);
+      return <IFile>{};
    }
+
+   /* Nivel de acceso  de la carpeta contenedora */
+   if (nivel === -1) {
+      const deplvl = findFile(+dep);
+      if (deplvl && nivel < deplvl.nivel)
+         nivel = deplvl.nivel;
+      else nivel = 1;
+   }
+
+   const ext = stat.isDirectory() ? '' :
+      path.parse(fileName).ext === '' ?
+         '~' : path.parse(fileName).ext.substring(1);
+   const file: IFile = {
+      ino: stat.ino.toString(),
+      name: fileName,
+      ext: ext,
+      isFile: stat.isFile(),
+      available: true,
+      birthtime: stat.birthtime,
+      fullSize: stat.size,
+      size: parseSize(stat.size),
+      dependency: dep.toString(),
+      nivel: nivel
+   };
+
+   return file;
 }
+
+/**
+ * =====================
+ *    Generic Queries   
+ * =====================
+ */
 
 const insertFile = (file: IFile): void => {
    const query = insertQuery(file);
@@ -205,7 +180,10 @@ const insertFileSync = (file: IFile): boolean => {
    }
 
 }
-
+/**
+ * Returns the query to update the file reg
+ * @param file fiel
+ */
 const insertQuery = (file: IFile): string => {
    return `
       INSERT INTO archivos (
@@ -233,132 +211,61 @@ const insertQuery = (file: IFile): string => {
          , ${file.nivel}
       );`;
 }
-
 /**
- * ¯\\_(ツ)_/¯
- * @param data 
- * @param message 
- * @param con 
+ * Doesn't actually remove the file from the server, 
+ * it just marks it as unavailable
+ * @param ino 
  */
-export const createJSON = (data: string
-   , message: string
-   , con: boolean) => {
-   fs.writeFile('files.json', data, 'utf8',
-      (err) => {
-         if (err) {
-            console.log('An error occurred during initialization.');
-            return;
-         }
-         console.log(`\nfiles.json Successfully ${message}!\n`);
-         if (con) JSON.parse(fs.readFileSync('files.json', 'utf8'));
-         return;
-      });
-}
-
-/**
- * Retrieves the full path to a file
- * @param file the file
- */
-export const getFileFullPath = (file: IFile): string => {
-   let dir: string = cwd + _ + parseDependency(file);
-   return dir;
-}
-
-/**
- * Finds the relative path to a file
- * @param file the file
- */
-export const parseDependency = (file: IFile): string => {
-   let dir: string = file.name;
-   if (file.dependency) {
-      dir = parseDependency(findFile(file.dependency)) + _ + dir;
-   }
-   return dir;
-}
-/**
- * Looks for a specific file inside the database
- * @param ino the file's unique identifier
- */
-export const findFile = (ino: string | number = 0): IFile => {
-   //    /* Wait for the file to be found ¯\_(ツ)_/¯ */
-   let [file] = connSync.run(
-      `SELECT * FROM archivos WHERE ino=? && available=1`
-      , [ino]
+const deleteFile = (ino: string | number): void => {
+   console.log(ino);
+   conn.run(`
+       UPDATE archivos SET
+         available = 0
+      WHERE ino = ${+ino} COLLATE NOCASE`,
+      (e) => console.log('\x1b[31mDelete\x1b[36m ' + (e ? e.message : ino))
    );
-
-   if (!file) return file;
-   return { ...file, isFile: file.isFile !== 0 ? true : false };
+   conn.all(`SELECT ino FROM archivos WHERE dependency=? COLLATE NOCASE`
+      , [+ino]
+      , (err, rows: IFile) => deleteFile(rows.ino)
+   );
 }
 
 /**
- * Sets the new directory cloudster will be working with
- * @param dir the new directory
+ * Doesn't actually remove the file from the server,
+ * it just marks it as unavailable
+ * @param ino
  */
-export const setDirectory = (dir: string): boolean => {
-   // console.log(dir);
-   cwd = dir;
-   console.log("UPDATING")
-
-   initializeServer();
-
-   return true;
-   // try {
-   //    fs.accessSync(dir);
-   //    let directory = fs.readFileSync(dir + _ + 'folder', 'utf-8');
-   //    try {
-   //       fs.accessSync(directory);
-   //       cwd = directory;
-   //      
-   //       return true;
-   //    }
-   //    catch (e) {
-   //       console.log(directory);
-   //       console.log(`La direccion en el archivo 'Directorio.txt' no es valida`);
-   //       console.log(`Corrija y vuelva a intentarlo`);
-   //       return false;
-   //    }
-   // }
-   // catch (err) {
-   //    console.log('--------------    Creando Directorio.txt    --------------');
-   //    try {
-   //       fs.writeFileSync('dir', dir + _ + 'folder', 'utf8');
-   //       initializeServer();
-   //       return true;
-   //    }
-   //    catch (e) {
-   //       console.log('Ha ocurrido un error al inicializar.');
-   //       return false;
-   //       process.exit();
-   //    }
-   // }
-}
-
-/**
- * Verifies that the user indeed has permission to access the file he requested
- * @param req The incoming request
- * @param res The outgoing response
- */
-const verifyPermission = (req: Request, res: Response): any[] => {
-   const { key } = getTokenKey(req.header('Authorization'));
-   const [{ nivel }] = connSync
-      .run(
-         `SELECT nivel FROM usuarios WHERE key=? COLLATE NOCASE`
-         , [key]
+const deleteFileSync = (ino: string | number): boolean => {
+   try {
+      connSync.run(`
+       UPDATE archivos SET
+         available = 0
+      WHERE ino = ? COLLATE NOCASE`
+         , [+ino]
+      );
+      const dep: IFile[] = connSync.run(`
+         SELECT ino FROM archivos WHERE dependency=? COLLATE NOCASE`
+         , [+ino]
       );
 
-   if (!req.params.ino) return [nivel, { ino: 0 }]
-
-   const file = findFile(req.params.ino);
-   if (!file) {
-      res.status(404).send();
-      return [-1, {}];
-   };
-   if (file.nivel > nivel) {
-      res.status(401).json({ message: `No tiene acceso a este archivo` });
-      return [-1, {}];
+      console.log('\x1b[31mDelete \x1b[36mSYNC \x1b[0m ' + ino)
+      dep.forEach(file => {
+         deleteFileSync(file.ino);
+      });
+      return true;
+   } catch (e) {
+      console.log('\x1b[31mDelete \x1b[36mSYNC \x1b[0m ' + (e ? e.message : ino))
+      return false;
    }
-   return [nivel, file];
 }
+
+
+
+/**
+ * ====================================
+ *    The actual routes' controller    
+ * ====================================
+ */
 
 /**
  * Retrieves all the files inside a folder, excluding all of those which level
@@ -472,6 +379,11 @@ export const postFile = (req: Request, res: Response): void => {
    }
 }
 
+/**
+ * Doesn't actually changes the file but updates its access level
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
 export const putFile = (req: Request, res: Response): void => {
    const { nivel } = <IFile>req.body;
    connSync.run(`
@@ -481,11 +393,126 @@ export const putFile = (req: Request, res: Response): void => {
    `);
    res.status(200).json({ message: 'Oll korrect' });
 }
-
+/**
+ * Doesn't actually deletes the file but marks it as unavailable
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
 export const removeFile = (req: Request, res: Response): void => {
    deleteFileSync(req.params.ino);
 }
 
+
+/**
+ * ===============
+ *    Utilities   
+ * ===============
+ */
+
+/**
+* Sets the new directory cloudster will be working with
+* @param dir the new directory
+*/
+export const setDirectory = (dir: string): boolean => {
+   cwd = dir;
+   console.log("UPDATING")
+
+   initializeServer();
+
+   return true;
+   // try {
+   //    fs.accessSync(dir);
+   //    let directory = fs.readFileSync(dir + _ + 'folder', 'utf-8');
+   //    try {
+   //       fs.accessSync(directory);
+   //       cwd = directory;
+   //      
+   //       return true;
+   //    }
+   //    catch (e) {
+   //       console.log(directory);
+   //       console.log(`La direccion en el archivo 'Directorio.txt' no es valida`);
+   //       console.log(`Corrija y vuelva a intentarlo`);
+   //       return false;
+   //    }
+   // }
+   // catch (err) {
+   //    console.log('--------------    Creando Directorio.txt    --------------');
+   //    try {
+   //       fs.writeFileSync('dir', dir + _ + 'folder', 'utf8');
+   //       initializeServer();
+   //       return true;
+   //    }
+   //    catch (e) {
+   //       console.log('Ha ocurrido un error al inicializar.');
+   //       return false;
+   //       process.exit();
+   //    }
+   // }
+}
+
+/**
+ * Verifies that the user indeed has permission to access the file he requested
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
+const verifyPermission = (req: Request, res: Response): any[] => {
+   const { key } = getTokenKey(req.header('Authorization'));
+   const [{ nivel }] = connSync
+      .run(
+         `SELECT nivel FROM usuarios WHERE key=? COLLATE NOCASE`
+         , [key]
+      );
+
+   if (!req.params.ino) return [nivel, { ino: 0 }]
+
+   const file = findFile(req.params.ino);
+   if (!file) {
+      res.status(404).send();
+      return [-1, {}];
+   };
+   if (file.nivel > nivel) {
+      res.status(401).json({ message: `No tiene acceso a este archivo` });
+      return [-1, {}];
+   }
+   return [nivel, file];
+}
+
+/**
+ * Retrieves the full path to a file
+ * @param file the file
+ */
+export const getFileFullPath = (file: IFile): string => {
+   let dir: string = cwd + _ + parseDependency(file);
+   return dir;
+}
+
+/**
+ * Finds the relative path to a file
+ * @param file the file
+ */
+export const parseDependency = (file: IFile): string => {
+   let dir: string = file.name;
+   if (file.dependency) {
+      dir = parseDependency(findFile(file.dependency)) + _ + dir;
+   }
+   return dir;
+}
+
+/**
+ * Looks for a specific file inside the database
+ * @param ino the file's unique identifier
+ */
+export const findFile = (ino: string | number = 0): IFile => {
+   //    /* Wait for the file to be found ¯\_(ツ)_/¯ */
+   let [file] = connSync.run(
+      `SELECT * FROM archivos WHERE ino=? && available=1`
+      , [ino]
+   );
+
+   if (!file) return file;
+   return { ...file, isFile: file.isFile !== 0 ? true : false };
+}
 
 /**
  * Converts the bytes into its correspoding unit in terms of space
