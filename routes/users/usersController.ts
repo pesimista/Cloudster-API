@@ -13,6 +13,7 @@ export const getUsers = (req: Request, res: Response): void => {
       \`id\`,
       \`usuario\`,
       \`nombre\`,
+      \`apellido\`,
       \`desde\`,
       \`pregunta1\`,
       \`pregunta2\`,
@@ -110,7 +111,8 @@ export const login = (req: Request, res: Response): void => {
 }
 
 /**
- * Makes a new entry if all the conditions are met
+ * Makes a new entry if all the conditions are met, 
+ * returns the user + its access key as a JWT
  * @param body The user information
  * @param callback The callback function to be called afterwards
  */
@@ -202,68 +204,82 @@ export const register = (req: Request, res: Response): void => {
    );//Select * from usuarios
 }
 
+/**
+ * Updates the user info, if everything goes as espected,
+ * then it retrieves the updated information
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
 export const updateUserData = (req: Request, res: Response): void => {
    const body = req.body as unknown as IUser;
-   conn.get(`SELECT * FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`, (err: Error, row: IUser) => {
-      if (err) { console.log(err) }
-      if (!row) {
-         res.status(400).json({ message: `El usuario no existe` })
-         return;
-      }
-
-      // else if (body.confirmpassword !== row.password) {
-      //    res.status(401).json({
-      //       message: `La contraseña de confirmación no coincide con la actual.`,
-      //    });
-      //    return;
-      // }
-
-      let query: string = 'UPDATE usuarios SET ';
-      /**
-       * Loop to add all the fields in the database
-       */
-      const keys = [
-         { name: "usuario", has: true },
-         { name: "nombre", has: true },
-         { name: "apellido", has: true },
-         { name: "password", has: true },
-         { name: "pregunta1", has: false },
-         { name: "respuesta1", has: false },
-         { name: "pregunta2", has: true },
-         { name: "respuesta2", has: true },
-         { name: "nivel", has: false },
-      ]
-      keys.forEach(
-         (key) => {
-            const { name, has } = key
-            if (body[name]) {
-               if (has) query += ` ${name}='${body[name]}',`;
-               else query += ` ${name}=${body[name]},`;
-            }
+   conn.get(`SELECT * FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`,
+      (err: Error, row: IUser) => {
+         /* Error handling */
+         if (err) {
+            res.status(500).json({ message: err.message });
+            console.log(err);
+            return;
          }
-      );
+         /* If the user doesn't exists */
+         if (!row) {
+            res.status(400).json({ message: `El usuario no existe` })
+            return;
+         }
 
-      query += `intentos=0 WHERE id='${req.params.id}' COLLATE NOCASE;`
+         let query: string = 'UPDATE usuarios SET ';
+         /*  Loop to add all the fields in the database */
+         const keys = [
+            { name: "usuario", has: true },
+            { name: "nombre", has: true },
+            { name: "apellido", has: true },
+            { name: "password", has: true },
+            { name: "pregunta1", has: false },
+            { name: "respuesta1", has: false },
+            { name: "pregunta2", has: true },
+            { name: "respuesta2", has: true },
+            { name: "nivel", has: false },
+         ]
+         keys.forEach(
+            (key) => {
+               const { name, has } = key
+               if (body[name]) {
+                  if (has) query += ` ${name}='${body[name]}',`;
+                  else query += ` ${name}=${body[name]},`;
+               }
+            }
+         );
 
-      conn.serialize(() => {
-         conn
-            .run(query)
-            .get(`SELECT * FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`,
-               (errGet: any, updatedValues: IUser) => {
-                  if (errGet) {
-                     res.status(500).json({ name: errGet.code, message: errGet.message });
-                     return;
-                  }
-                  res.status(200).json({
-                     response: `Usuario actualizado`,
-                     token: hashToken(updatedValues)
-                  });//send response
-               }//get callback
-            )//conn get
-      });//serialize
-   })//initial get
+         query += `intentos=0 WHERE id='${req.params.id}' COLLATE NOCASE;`
+
+         /* The query excecution */
+         conn.serialize(() => {
+            conn
+               /* runs the update query  */
+               .run(query)
+               /* Gets the updated info from the database */
+               .get(`SELECT * FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`,
+                  (errGet: any, updatedValues: IUser) => {
+                     /* Error handling */
+                     if (errGet) {
+                        res.status(500).json({ name: errGet.code, message: errGet.message });
+                        return;
+                     }
+                     /* Oll Korrect */
+                     res.status(200).json({
+                        response: `Usuario actualizado`,
+                        token: hashToken(updatedValues)
+                     });//send response
+                  }//get callback
+               )//conn get
+         });//serialize
+      })//initial get
 }//updateUserData
 
+/**
+ * Deletes an user from the database;
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
 export const deleteUser = (req: Request, res: Response): void => {
    const query = `DELETE 
    FROM
@@ -280,16 +296,23 @@ export const deleteUser = (req: Request, res: Response): void => {
    })
 }
 
-export const getQuestions = (callback: Function) => {
+/**
+ * Sends back all the questions
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
+export const getQuestions = (req: Request, res: Response) => {
    const query = `SELECT pregunta FROM preguntas`
    conn.all(query, (error: Error, rows: string[]) => {
-      callback({
-         status: error ? 500 : 200,
-         responseBody: rows
-      });
+      res.status(200).json(rows);
    });
 }
 
+/**
+ * Retrieves the questions selected by a specific user
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
 export const getUserQuestions = (req: Request, res: Response): void => {
    const query = `SELECT 
       \`preguntas\`.\`id\` as id_pregunta,
@@ -320,6 +343,9 @@ export const getUserQuestions = (req: Request, res: Response): void => {
       }
       const [pregunta1] = rows.filter(a => a.id_pregunta === a.pregunta1);
       const [pregunta2] = rows.filter(a => a.id_pregunta === a.pregunta2);
+      /**
+       * Sends username, userid, and both questions
+       * */
       res.status(200).json({
          usuario: rows[0].usuario,
          id_usuario: rows[0].id_usuario,
@@ -329,6 +355,12 @@ export const getUserQuestions = (req: Request, res: Response): void => {
    });//all
 }
 
+/**
+ * Verifies whether or not the answers to the given questions match what is 
+ * stores in the database, if they do, a new key to renew the password is sent
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
 export const checkUserQuestions = (req: Request, res: Response): void => {
    const id = req.params.id;
    const { respuesta1, respuesta2 } = req.body;
@@ -351,6 +383,7 @@ export const checkUserQuestions = (req: Request, res: Response): void => {
             });
             return;
          }
+         else res.status(401).json({ message: "Las respuestas no concuerdan" });
       })
 }
 
@@ -363,7 +396,8 @@ const hashToken = (user: IUser, key?: string): string => {
       id: user.id,
       usuario: user.usuario,
       nombre: user.nombre,
-      password: user.password,
+      apellido: user.apellido,
+      // password: user.password,
       nivel: user.nivel,
       key: key || user.key,
       expires: now.setHours(now.getHours() + 1)

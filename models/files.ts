@@ -5,6 +5,7 @@ export interface IFile {
    url?: string;
    ext: string;
    isFile: boolean;
+   available: boolean;
    lastModified?: Date;
    lastChanged?: Date;
    lastAccessed?: Date;

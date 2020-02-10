@@ -77,6 +77,8 @@ function onError(error: any) {
    }
 }
 
+// console.clear();
+console.log(__dirname);
 setDirectory(__dirname);
 
 /**

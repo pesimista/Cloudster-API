@@ -18,7 +18,7 @@ router.get('/:id', Authorization, getUsers);
 router.get('/:usuario/questions', getUserQuestions);
 router.get('/', Authorization, getUsers);
 
-/* POST users listing. */
+/* POST a new user. */
 router.post('/:id/questions', checkUserQuestions);
 router.post('/login', login);
 router.post('/', register);

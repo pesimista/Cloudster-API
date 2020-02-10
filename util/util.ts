@@ -22,7 +22,13 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
       res.status(401).send();
       return;
    }
-   const decoded = getTokenKey(token);
+   let decoded;
+   try {
+      decoded = getTokenKey(token);
+   } catch (error) {
+      return res.status(500).json({ message: error.message });
+   }
+
    if (!decoded.key) {
       res.status(401).send();
       return;
