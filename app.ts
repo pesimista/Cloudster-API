@@ -1,8 +1,7 @@
 import express, { Application, Request, Response, NextFunction } from "express";
-import path from "path";
 import logger from "morgan";
-// import cookieParser from "cookie-parser";
-const multer = require("multer");
+import compression from "compression";
+import helmet from "helmet";
 
 import indexRouter from "./routes/index.route";
 import usersRouter from "./routes/users/usersRoute";
@@ -11,6 +10,12 @@ import filesRouter from "./routes/files/rangerRoute";
 /* Instantiate app */
 const app: Application = express();
 
+/* Compresses all routes */
+app.use(compression());
+
+
+/* Sets appropriate HTTP headers in order to help protect the app from well-known web vulnerabilities  */
+app.use(helmet());
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -19,13 +24,13 @@ app.use(express.urlencoded({ extended: false }));
 // app.use(express.static(path.join(__dirname, 'public')));
 
 /**
- * Cross Origin Requests Service 
+ * Cross Origin Requests Service
  */
 app.use((req: Request, res: Response, next: NextFunction) => {
    res.header('Access-Control-Allow-Origin', '*');
    res.header('Access-Control-Allow-Headers', '*');
 
-   console.log(`\n${getColor(req.method)}\t\x1b[36m'${req.originalUrl}'\x1b[0m\t `)
+   // console.log(`\n${getColor(req.method)}\t\x1b[36m'${req.originalUrl}'\x1b[0m\t `)
 
    /* Pa que no aparezca en gris el req >///< */
    if (req.method === 'OPTIONS') {

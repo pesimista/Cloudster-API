@@ -2,12 +2,16 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import sqlite from 'sqlite3';
 import { IUser } from "../models/user";
+import sqliteSync from "sqlite-sync";
+
+export const connSync = sqliteSync.connect('./cloudster.db');
 
 
 const sqlite3 = sqlite.verbose();
 
-export const connSync = require("sqlite-sync").connect('./cloudster.db');
-export const conn = new sqlite3.Database('./cloudster.db', (err: Error | null) => {
+export const conn = new sqlite3.Database('./cloudster.db')
+/*
+, (err: Error | null) => {
    if (err) {
       console.log("Error");
    }
@@ -15,8 +19,9 @@ export const conn = new sqlite3.Database('./cloudster.db', (err: Error | null) =
       console.log(randomUpper('cONNeCTed suCcESsfUlLy To tHe DatABasE'));
    }
 });
+*/
 /**
- * Express Middleware to validate that the key sent by the client has a 
+ * Express Middleware to validate that the key sent by the client has a
  * key that corresponds to the user
  * @param req The incoming request
  * @param res The outgoing response
@@ -56,9 +61,9 @@ export const getTokenKey = (token: string = ''): IUser => {
 }
 
 /**
-* Nada, pone letras mayusculas de forma aleatoria en las palaras
-* @param value la frase
-*/
+ * Nada, pone letras mayusculas de forma aleatoria en las palaras
+ * @param value la frase
+ */
 export const randomUpper = (value: string): string => {
    value = value.trim();
    let toReturn = "";

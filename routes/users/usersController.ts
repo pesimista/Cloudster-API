@@ -9,7 +9,7 @@ import { conn } from "../../util/util";
 export const getUsers = (req: Request, res: Response): void => {
    const id = req.params.id;
    const exe = id ? 'get' : 'all';
-   const query = `SELECT 
+   const query = `SELECT
       \`id\`,
       \`usuario\`,
       \`nombre\`,
@@ -19,7 +19,7 @@ export const getUsers = (req: Request, res: Response): void => {
       \`pregunta2\`,
       \`respuesta1\`,
       \`respuesta2\`,
-      \`nivel\` 
+      \`nivel\`
    FROM usuarios`;
 
    const where = id ? ` WHERE id="${id}";` : ';';
@@ -30,7 +30,7 @@ export const getUsers = (req: Request, res: Response): void => {
 }
 
 /**
- * Verifies whether or not theres is an user with the given 
+ * Verifies whether or not theres is an user with the given
  * credentials and returns a token
  * @param body The User information
  * @param callback The callback function to be called afterwards
@@ -43,8 +43,8 @@ export const login = (req: Request, res: Response): void => {
       return;
    };
    try {
-      conn.get(`SELECT * FROM usuarios 
-            WHERE 
+      conn.get(`SELECT * FROM usuarios
+            WHERE
                usuario='${body.usuario}'
             COLLATE NOCASE;`,
          (err: any, row: IUser) => {
@@ -60,10 +60,10 @@ export const login = (req: Request, res: Response): void => {
                return;
             } else if (row.password.trim() !== body.password.trim() || row.intentos >= 3) {
                conn.serialize(() => {
-                  conn.run(`UPDATE usuarios 
-                     SET 
-                        intentos=intentos+1 
-                     WHERE 
+                  conn.run(`UPDATE usuarios
+                     SET
+                        intentos=intentos+1
+                     WHERE
                         usuario='${body.usuario}'
                      COLLATE NOCASE;`,
                      (errorOnRun: Error) => {
@@ -83,16 +83,16 @@ export const login = (req: Request, res: Response): void => {
                // });
                const key = crypto.randomBytes(16).toString("hex");
 
-               conn.run(`UPDATE usuarios 
-                  SET 
+               conn.run(`UPDATE usuarios
+                  SET
                      intentos=0,
-                     key="${key}" 
-                  WHERE 
+                     key="${key}"
+                  WHERE
                      usuario='${body.usuario}'
                   COLLATE NOCASE;`,
-                  (errRUN: Error) => {
-                     if (errRUN) { console.log(errRUN.message, "Line : 153"); return }
-                  }
+                  // (errRUN: Error) => {
+                  //    if (errRUN) { console.log(errRUN.message, "Line : 153"); return }
+                  // }
                );
                const token = hashToken(row, key);
                res.status(200).send({
@@ -111,7 +111,7 @@ export const login = (req: Request, res: Response): void => {
 }
 
 /**
- * Makes a new entry if all the conditions are met, 
+ * Makes a new entry if all the conditions are met,
  * returns the user + its access key as a JWT
  * @param body The user information
  * @param callback The callback function to be called afterwards
@@ -184,24 +184,24 @@ export const register = (req: Request, res: Response): void => {
                "${key}"
             )`).get(
                `SELECT * FROM usuarios WHERE usuario='${body.usuario}'`,
-               (err: any, row: IUser) => {
-                  if (err) {
+               (err2: any, row2: IUser) => {
+                  if (err2) {
                      /* Internal server error */
-                     res.status(500).json({ name: err.code, message: err.message });
+                     res.status(500).json({ name: err2.code, message: err2.message });
                      return
                   }
                   // makeReg({
-                  //    userId: row.id,
+                  //    userId: row2.id,
                   //    accion: 'register'
                   // });
                   res.status(200).send({
                      response: `Grant access`,
-                     token: hashToken(row, key)
-                  });//Callback
-               })//Get
-         })//Serialize
-      }//Callback
-   );//Select * from usuarios
+                     token: hashToken(row2, key)
+                  });// Callback
+               })// Get
+         })// Serialize
+      }// Callback
+   );// Select * from usuarios
 }
 
 /**
@@ -217,7 +217,7 @@ export const updateUserData = (req: Request, res: Response): void => {
          /* Error handling */
          if (err) {
             res.status(500).json({ message: err.message });
-            console.log(err);
+            // console.log(err);
             return;
          }
          /* If the user doesn't exists */
@@ -268,12 +268,12 @@ export const updateUserData = (req: Request, res: Response): void => {
                      res.status(200).json({
                         response: `Usuario actualizado`,
                         token: hashToken(updatedValues)
-                     });//send response
-                  }//get callback
-               )//conn get
-         });//serialize
-      })//initial get
-}//updateUserData
+                     });// send response
+                  }// get callback
+               )// conn get
+         });// serialize
+      })// initial get
+}// updateUserData
 
 /**
  * Deletes an user from the database;
@@ -281,10 +281,10 @@ export const updateUserData = (req: Request, res: Response): void => {
  * @param res The outgoing response
  */
 export const deleteUser = (req: Request, res: Response): void => {
-   const query = `DELETE 
+   const query = `DELETE
    FROM
       usuarios
-   WHERE 
+   WHERE
       \`id\`='${req.params.id}';`;
 
    conn.run(query, (error: any) => {
@@ -314,22 +314,22 @@ export const getQuestions = (req: Request, res: Response) => {
  * @param res The outgoing response
  */
 export const getUserQuestions = (req: Request, res: Response): void => {
-   const query = `SELECT 
+   const query = `SELECT
       \`preguntas\`.\`id\` as id_pregunta,
       \`pregunta1\`,
       \`pregunta2\`,
       \`usuario\`,
       \`usuarios\`.\`id\` as id_usuario,
       \`pregunta\`
-   FROM 
+   FROM
       \`usuarios\`
-   INNER JOIN 
+   INNER JOIN
       \`preguntas\`
-   ON 
+   ON
       \`preguntas\`.\`id\`=\`usuarios\`.\`pregunta1\`
-   OR 
+   OR
       \`preguntas\`.\`id\`=\`usuarios\`.\`pregunta2\`
-   WHERE 
+   WHERE
       \`usuarios\`.\`usuario\`='${req.params.usuario}' COLLATE NOCASE;`;
 
    conn.all(query, (error: any, rows: any[]) => {
@@ -343,20 +343,18 @@ export const getUserQuestions = (req: Request, res: Response): void => {
       }
       const [pregunta1] = rows.filter(a => a.id_pregunta === a.pregunta1);
       const [pregunta2] = rows.filter(a => a.id_pregunta === a.pregunta2);
-      /**
-       * Sends username, userid, and both questions
-       * */
+      /* Sends username, userid, and both questions */
       res.status(200).json({
          usuario: rows[0].usuario,
          id_usuario: rows[0].id_usuario,
          pregunta1: pregunta1.pregunta,
          pregunta2: pregunta2.pregunta
       })
-   });//all
+   });// all
 }
 
 /**
- * Verifies whether or not the answers to the given questions match what is 
+ * Verifies whether or not the answers to the given questions match what is
  * stores in the database, if they do, a new key to renew the password is sent
  * @param req The incoming request
  * @param res The outgoing response

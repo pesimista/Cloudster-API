@@ -47,7 +47,7 @@ export const initializeServer = (): void => {
          , size = '${selected.size}'
       WHERE ino = ? COLLATE NOCASE`
          , rowIno.ino
-         , (e) => console.log('\x1b[34mUpdate \x1b[36mASYNC\x1b[0m ' + (e ? e.message : rowIno.ino))
+         // , (e) => console.log('\x1b[34mUpdate \x1b[36mASYNC\x1b[0m ' + (e ? e.message : rowIno.ino))
       );
    });
 
@@ -56,7 +56,7 @@ export const initializeServer = (): void => {
 }
 
 /**
- * Checks if all the files currently located on the 
+ * Checks if all the files currently located on the
  * initial path are avalible in the database
  * @param error the error that might occur during query execution
  * @param rows the retrieved rows by the query
@@ -64,7 +64,7 @@ export const initializeServer = (): void => {
  */
 const checkFiles = (error: Error, rows: IFile[], files: IFile[]): void => {
    if (error) {
-      console.log("\x1b[31mERROR\t\x1b[0m " + error.message);
+      // console.log("\x1b[31mERROR\t\x1b[0m " + error.message);
       return;
    }
 
@@ -89,12 +89,13 @@ const checkFiles = (error: Error, rows: IFile[], files: IFile[]): void => {
  * @param nivel The Hierarchy to be assign to the file
  */
 const loadFiles = (dir: PathLike, dep: string = '0', nivel: number = 1): IFile[] => {
-   let files: IFile[] = [], unprocessedFiles: Dirent[];
+   let files: IFile[] = [];
+   let unprocessedFiles: Dirent[];
    try {
       unprocessedFiles = fs.readdirSync(dir, { withFileTypes: true });
    }
    catch (err) {
-      console.log(`no such file or directory, readdir ${dir}`);
+      // console.log(`no such file or directory, readdir ${dir}`);
       // return { status: 500, response: { ...err, message: 'readdirSync: ' + err.message } };
       return [];
    }
@@ -125,8 +126,8 @@ const generateFile = (fileName: string, dir: string, dep: string | number, nivel
    try {
       stat = fs.statSync(dir + _ + fileName);
    } catch (e) {
-      console.log(`no such file or directory, stat ${dir + _ + fileName}`);
-      return <IFile>{};
+      // console.log(`no such file or directory, stat ${dir + _ + fileName}`);
+      return {} as IFile;
    }
 
    /* Nivel de acceso  de la carpeta contenedora */
@@ -143,14 +144,14 @@ const generateFile = (fileName: string, dir: string, dep: string | number, nivel
    const file: IFile = {
       ino: stat.ino.toString(),
       name: fileName,
-      ext: ext,
+      ext,
       isFile: stat.isFile(),
       available: true,
       birthtime: stat.birthtime,
       fullSize: stat.size,
       size: parseSize(stat.size),
       dependency: dep.toString(),
-      nivel: nivel
+      nivel
    };
 
    return file;
@@ -158,7 +159,7 @@ const generateFile = (fileName: string, dir: string, dep: string | number, nivel
 
 /**
  * =====================
- *    Generic Queries   
+ *    Generic Queries
  * =====================
  */
 
@@ -166,16 +167,16 @@ const insertFile = (file: IFile): void => {
    const query = insertQuery(file);
    // console.log(query)
    // console.log("------------------------------")
-   conn.run(query, (e) => console.log('\x1b[33mINSERT \x1b[36mASYNC\x1b[0m ' + (e ? e.message : file.ino)));
+   conn.run(query/*, (e) => console.log('\x1b[33mINSERT \x1b[36mASYNC\x1b[0m ' + (e ? e.message : file.ino)) */);
 }
 const insertFileSync = (file: IFile): boolean => {
    const query = insertQuery(file);
    try {
       connSync.run(query);
-      console.log('\x1b[33mINSERT \x1b[36mSYNC \x1b[0m ' + file.ino);
+      // console.log('\x1b[33mINSERT \x1b[36mSYNC \x1b[0m ' + file.ino);
       return true;
    } catch (e) {
-      console.log("\x1b[31mERROR \x1b[36mSYNC \x1b[0m " + e.message);
+      // console.log("\x1b[31mERROR \x1b[36mSYNC \x1b[0m " + e.message);
       return false;
    }
 
@@ -197,7 +198,7 @@ const insertQuery = (file: IFile): string => {
          , size
          , dependency
          , nivel
-      ) 
+      )
       VALUES (
          ${file.ino}
          , '${file.name}'
@@ -212,17 +213,17 @@ const insertQuery = (file: IFile): string => {
       );`;
 }
 /**
- * Doesn't actually remove the file from the server, 
+ * Doesn't actually remove the file from the server,
  * it just marks it as unavailable
- * @param ino 
+ * @param ino
  */
 const deleteFile = (ino: string | number): void => {
-   console.log(ino);
+   // console.log(ino);
    conn.run(`
        UPDATE archivos SET
          available = 0
-      WHERE ino = ${+ino} COLLATE NOCASE`,
-      (e) => console.log('\x1b[31mDelete\x1b[36m ' + (e ? e.message : ino))
+      WHERE ino = ${+ino} COLLATE NOCASE`
+      // ,(e) => console.log('\x1b[31mDelete\x1b[36m ' + (e ? e.message : ino))
    );
    conn.all(`SELECT ino FROM archivos WHERE dependency=? COLLATE NOCASE`
       , [+ino]
@@ -248,13 +249,13 @@ const deleteFileSync = (ino: string | number): boolean => {
          , [+ino]
       );
 
-      console.log('\x1b[31mDelete \x1b[36mSYNC \x1b[0m ' + ino)
+      // console.log('\x1b[31mDelete \x1b[36mSYNC \x1b[0m ' + ino)
       dep.forEach(file => {
          deleteFileSync(file.ino);
       });
       return true;
    } catch (e) {
-      console.log('\x1b[31mDelete \x1b[36mSYNC \x1b[0m ' + (e ? e.message : ino))
+      // console.log('\x1b[31mDelete \x1b[36mSYNC \x1b[0m ' + (e ? e.message : ino))
       return false;
    }
 }
@@ -263,7 +264,7 @@ const deleteFileSync = (ino: string | number): boolean => {
 
 /**
  * ====================================
- *    The actual routes' controller    
+ *    The actual routes' controller
  * ====================================
  */
 
@@ -280,14 +281,14 @@ export const getFilesInDirectory = (req: Request, res: Response): void => {
 
    const files: IFile[] = connSync
       .run(
-         `SELECT * FROM 
-            archivos 
-         WHERE 
-            dependency=? 
-         AND 
-            nivel<=? 
-         AND 
-            available=1   
+         `SELECT * FROM
+            archivos
+         WHERE
+            dependency=?
+         AND
+            nivel<=?
+         AND
+            available=1
          COLLATE NOCASE`
          , [file.ino, nivel]
       );
@@ -328,15 +329,15 @@ export const test = (req: Request, res: Response): void => {
  * @param res The outgoing response
  */
 export const postFile = (req: Request, res: Response): void => {
-   const where = !req.params.ino ? parseInt(req.params.ino) : 0;
-   const folder = !req.params.ino ? findFile(req.params.ino) : <IFile>{};
+   const where = !req.params.ino ? parseInt(req.params.ino, 10) : 0;
+   const folder = !req.params.ino ? findFile(req.params.ino) : {} as IFile;
 
    if (isNaN(where) || !folder) {
       res.status(400).send({ message: 'El ino no es compatible' });
       return;
    };
 
-   let baseDir = !req.params.ino ? getFileFullPath(folder) : cwd;
+   const baseDir = !req.params.ino ? getFileFullPath(folder) : cwd;
    const newName: string = baseDir + _ + req.file.originalname;
 
 
@@ -348,7 +349,7 @@ export const postFile = (req: Request, res: Response): void => {
          fs.statSync(newName);
       }
       catch (e) {
-         console.log(`no such file or directory, stat ${newName}`);
+         // console.log(`no such file or directory, stat ${newName}`);
          res.status(500).json({ message: e.message });
          return;
       }
@@ -358,8 +359,8 @@ export const postFile = (req: Request, res: Response): void => {
 
    } catch (e) {
       if (e && e.message.includes('cross-device link not permitted')) {
-         let is = fs.createReadStream(req.file.path);
-         let os = fs.createWriteStream(newName);
+         const is = fs.createReadStream(req.file.path);
+         const os = fs.createWriteStream(newName);
          is.pipe(os);
          is.on('end', () => {
             fs.unlinkSync(req.file.path);
@@ -385,7 +386,7 @@ export const postFile = (req: Request, res: Response): void => {
  * @param res The outgoing response
  */
 export const putFile = (req: Request, res: Response): void => {
-   const { nivel } = <IFile>req.body;
+   const { nivel } = req.body as IFile;
    connSync.run(`
       UPDATE archivos SET
          nivel=${nivel}
@@ -405,17 +406,17 @@ export const removeFile = (req: Request, res: Response): void => {
 
 /**
  * ===============
- *    Utilities   
+ *    Utilities
  * ===============
  */
 
 /**
-* Sets the new directory cloudster will be working with
-* @param dir the new directory
-*/
+ * Sets the new directory cloudster will be working with
+ * @param dir the new directory
+ */
 export const setDirectory = (dir: string): boolean => {
    cwd = dir;
-   console.log("UPDATING")
+   // console.log("UPDATING")
 
    initializeServer();
 
@@ -426,7 +427,7 @@ export const setDirectory = (dir: string): boolean => {
    //    try {
    //       fs.accessSync(directory);
    //       cwd = directory;
-   //      
+   //
    //       return true;
    //    }
    //    catch (e) {
@@ -483,7 +484,7 @@ const verifyPermission = (req: Request, res: Response): any[] => {
  * @param file the file
  */
 export const getFileFullPath = (file: IFile): string => {
-   let dir: string = cwd + _ + parseDependency(file);
+   const dir: string = cwd + _ + parseDependency(file);
    return dir;
 }
 
@@ -505,7 +506,7 @@ export const parseDependency = (file: IFile): string => {
  */
 export const findFile = (ino: string | number = 0): IFile => {
    //    /* Wait for the file to be found ¯\_(ツ)_/¯ */
-   let [file] = connSync.run(
+   const [file] = connSync.run(
       `SELECT * FROM archivos WHERE ino=? && available=1`
       , [ino]
    );
