@@ -9,6 +9,7 @@
       "baseUrl": ".",
       "esModuleInterop": true,
       "noImplicitAny": true,
+      "typeRoots": ["./typings", "node_modules/@types"],
       "paths": {
          "*": [
             "node_modules/*"

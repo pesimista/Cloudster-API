@@ -1,1 +1,1 @@
-declare module "sqlite-sync";
+declare module 'sqlite-sync';

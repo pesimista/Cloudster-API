@@ -1,15 +1,15 @@
+/// <reference types="./sqlite-sync"/>
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import sqlite from 'sqlite3';
 import { IUser } from "../models/user";
 import sqliteSync from "sqlite-sync";
 
-export const connSync = sqliteSync.connect('./cloudster.db');
-
+export const connSync = sqliteSync.connect('cloudster.db');
 
 const sqlite3 = sqlite.verbose();
-
 export const conn = new sqlite3.Database('./cloudster.db')
+console.log(conn);
 /*
 , (err: Error | null) => {
    if (err) {
@@ -29,8 +29,8 @@ export const conn = new sqlite3.Database('./cloudster.db')
  */
 export const Authorization = (req: Request, res: Response, next: NextFunction) => {
    const token = req.header('Authorization');
-   if (!token || !token.startsWith('bearer ')) {
-      res.status(401).send();
+   if (!token || !token.toLocaleLowerCase().startsWith('bearer ')) {
+      res.status(401).send('1');
       return;
    }
    let decoded;
@@ -41,14 +41,15 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
    }
 
    if (!decoded.key || !decoded.id) {
-      res.status(401).send();
+      res.status(401).send('2');
       return;
    }
-
-   conn.get(`SELECT '' FROM usuarios WHERE id=${decoded.id.trim()} AND key='${decoded.key.trim()}' COLLATE NOCASE`,
+   console.log(decoded.key);
+   
+   conn.get(`SELECT '' FROM usuarios WHERE id='${decoded.id.trim()}' AND key='${decoded.key.trim()}' COLLATE NOCASE`,
       (error: any, row) => {
          if (error || !row) {
-            res.status(401).json({ message: 'Unanthorized' });
+            res.status(401).json({ message: 'Unanthorized - ' + error?.message   });
             return;
          }
          return next();
@@ -57,7 +58,7 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
 }
 
 export const getTokenKey = (token: string = ''): IUser => {
-   return jwt.decode(token.replace('bearer ', '')) as unknown as IUser;
+   return jwt.decode(token.replace(/[Bb]earer /, '')) as unknown as IUser;
 }
 
 /**

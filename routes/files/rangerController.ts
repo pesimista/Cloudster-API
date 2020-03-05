@@ -3,6 +3,7 @@ import fs, { PathLike, Dirent } from "fs";
 import path from "path";
 import { IFile } from "../../models/files";
 import { conn, connSync, getTokenKey } from "../../util/util";
+import { IUser } from "../../models/user";
 
 /* The saparator */
 const _ = (process.platform === 'win32' ? '\\' : '/');
@@ -329,17 +330,16 @@ export const test = (req: Request, res: Response): void => {
  * @param res The outgoing response
  */
 export const postFile = (req: Request, res: Response): void => {
-   const where = !req.params.ino ? parseInt(req.params.ino, 10) : 0;
-   const folder = !req.params.ino ? findFile(req.params.ino) : {} as IFile;
-
-   if (isNaN(where) || !folder) {
+   const ino = parseInt(req.params.ino, 10);
+   if (isNaN(ino)) {
       res.status(400).send({ message: 'El ino no es compatible' });
       return;
    };
 
+   const folder = findFile(ino);   
+   
    const baseDir = !req.params.ino ? getFileFullPath(folder) : cwd;
    const newName: string = baseDir + _ + req.file.originalname;
-
 
    try {
       fs.accessSync(req.file.path);
@@ -506,10 +506,8 @@ export const parseDependency = (file: IFile): string => {
  */
 export const findFile = (ino: string | number = 0): IFile => {
    //    /* Wait for the file to be found ¯\_(ツ)_/¯ */
-   const [file] = connSync.run(
-      `SELECT * FROM archivos WHERE ino=? && available=1`
-      , [ino]
-   );
+   console.log(connSync.run(`SELECT * FROM archivos WHERE ino=${ino} AND available=1`));
+   const [file] = connSync.run(`SELECT * FROM archivos WHERE ino=${ino} AND available=1`);
 
    if (!file) return file;
    return { ...file, isFile: file.isFile !== 0 ? true : false };
