@@ -6,13 +6,13 @@ import helmet from "helmet";
 import indexRouter from "./routes/index.route";
 import usersRouter from "./routes/users/usersRoute";
 import filesRouter from "./routes/files/rangerRoute";
+import { getQuestions } from "./routes/users/usersController";
 
 /* Instantiate app */
 const app: Application = express();
 
 /* Compresses all routes */
 app.use(compression());
-
 
 /* Sets appropriate HTTP headers in order to help protect the app from well-known web vulnerabilities  */
 app.use(helmet());
@@ -45,6 +45,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
  */
 /* Usuarios */
 app.use('/api/users', usersRouter);
+app.get('/api/questions', getQuestions);
 /* Archivos */
 app.use('/api/files', filesRouter);
 app.use('/api', indexRouter);

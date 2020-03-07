@@ -9,7 +9,7 @@ export const connSync = sqliteSync.connect('cloudster.db');
 
 const sqlite3 = sqlite.verbose();
 export const conn = new sqlite3.Database('./cloudster.db')
-console.log(conn);
+
 /*
 , (err: Error | null) => {
    if (err) {

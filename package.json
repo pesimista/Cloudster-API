@@ -40,7 +40,7 @@
       "cookie-parser": "~1.4.4",
       "debug": "~2.6.9",
       "express": "~4.16.1",
-      "helmet": "^3.21.2",
+      "helmet": "^3.21.3",
       "http-errors": "~1.6.3",
       "jsonwebtoken": "^8.5.1",
       "morgan": "~1.9.1",
@@ -50,14 +50,14 @@
    },
    "devDependencies": {
       "@types/bcryptjs": "^2.4.2",
-      "@types/express": "^4.17.2",
+      "@types/express": "^4.17.3",
       "@types/http-errors": "^1.6.3",
-      "@types/jsonwebtoken": "^8.3.5",
-      "@types/morgan": "^1.7.37",
-      "@types/node": "^13.7.0",
+      "@types/jsonwebtoken": "^8.3.8",
+      "@types/morgan": "^1.9.0",
+      "@types/node": "^13.9.0",
       "nodemon": "^2.0.1",
       "ts-node": "^8.5.3",
       "tslint": "^6.0.0",
-      "typescript": "^3.7.5"
+      "typescript": "^3.8.3"
    }
 }

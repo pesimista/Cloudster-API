@@ -2,13 +2,12 @@ import { Response, Request } from "express";
 import jwt from "jsonwebtoken";
 import crypto, { pbkdf2Sync } from "crypto";
 import { IUser } from "../../models/user";
-import { conn } from "../../util/util";
+import { conn, connSync } from "../../util/util";
 // import ranger from "./ranger";
 
 
 export const getUsers = (req: Request, res: Response): void => {
    const id = req.params.id;
-   const exe = id ? 'get' : 'all';
    const query = `SELECT
       \`id\`,
       \`usuario\`,
@@ -22,11 +21,22 @@ export const getUsers = (req: Request, res: Response): void => {
       \`nivel\`
    FROM usuarios`;
 
-   const where = id ? ` WHERE id="${id}";` : ';';
-   conn[exe](query + where, (error: any, row: IUser | IUser[]) => {
-      if (error) res.status(500).json({ name: error.code, message: error.message });
-      else res.status(200).send(row);
-   });
+   const where = id ? ` WHERE id='${id}';` : ';';
+   let rows: IUser[] = [];
+   try {
+      rows = connSync.run(query + where);
+   }
+   catch (error) {
+      res.status(500).json({ name: error.code, message: error.message });
+      return;
+   }
+   if (id) {
+      res.status(200).send(rows[0] || {});
+      return;
+   }
+   else {
+      res.status(200).send(rows);
+   }
 }
 
 /**
@@ -42,70 +52,64 @@ export const login = (req: Request, res: Response): void => {
       res.status(400).json({ message: `Faltan datos` });
       return;
    };
+   let row: IUser;
    try {
-      conn.get(`SELECT * FROM usuarios
-            WHERE
-               usuario='${body.usuario}'
-            COLLATE NOCASE;`,
-         (err: any, row: IUser) => {
-            if (err) {
-               /* Internal server error */
-               res.status(500).json({ name: err.code, message: err.message });
-               return;
-            }
-
-            if (!row) {
-               /* Unathorized */
-               res.status(401).json({ message: `Credenciales incorrectas` });
-               return;
-            } else if (row.password.trim() !== body.password.trim() || row.intentos >= 3) {
-               conn.serialize(() => {
-                  conn.run(`UPDATE usuarios
-                     SET
-                        intentos=intentos+1
-                     WHERE
-                        usuario='${body.usuario}'
-                     COLLATE NOCASE;`,
-                     (errorOnRun: Error) => {
-                        /* Unathorized */
-                        res.status(401)
-                           .send(++row.intentos >= 3 ?
-                              `Bloqueado por multiples intentos fallidos` :
-                              `Credenciales incorrectas.`)
-                        return;
-                     }
-                  );
-               });
-            } else {
-               // makeReg({
-               //    userId: row.id,
-               //    accion: 'login'
-               // });
-               const key = crypto.randomBytes(16).toString("hex");
-
-               conn.run(`UPDATE usuarios
-                  SET
-                     intentos=0,
-                     key="${key}"
-                  WHERE
-                     usuario='${body.usuario}'
-                  COLLATE NOCASE;`,
-                  // (errRUN: Error) => {
-                  //    if (errRUN) { console.log(errRUN.message, "Line : 153"); return }
-                  // }
-               );
-               const token = hashToken(row, key);
-               res.status(200).send({
-                  response: `Grant access`,
-                  user: token
-               });
-               return;
-            }
-         });
+      [row] = connSync.run(`
+      SELECT * FROM usuarios
+         WHERE
+            usuario='${body.usuario}'
+         COLLATE NOCASE;
+      `);
+   } catch (err) {
+      res.status(500).json({ name: err.code, message: err.message });
+      return;
    }
-   catch (err) {
-      /* Internal server error */
-      res.status(500).json(err);
+
+   if (!row) {
+      /* Unathorized */
+      res.status(401).json({ message: `Credenciales incorrectas` });
+      return;
+   } else if (row.password.trim() !== body.password.trim() || row.intentos >= 3) {
+
+      connSync.run(`UPDATE usuarios
+         SET
+            intentos=intentos+1
+         WHERE
+            usuario='${body.usuario}'
+         COLLATE NOCASE;`);
+      /* Unathorized */
+      res.status(401)
+         .send(++row.intentos >= 3 ?
+            `Bloqueado por multiples intentos fallidos` :
+            `Credenciales incorrectas.`
+         );
+   } else {
+      // makeReg({
+      //    userId: row.id,
+      //    accion: 'login'
+      // });
+      const key = crypto.randomBytes(16).toString("hex");
+
+      connSync.run(`
+         UPDATE usuarios SET
+            intentos=0,
+            key='${key}'
+         WHERE
+            usuario='${body.usuario}'
+         COLLATE NOCASE;`,
+      );
+      const token = hashToken(row, key);
+      res.status(200).send({
+         response: `Grant access`,
+         token: token,
+         user: {
+            ...row,
+            respuesta2: undefined,
+            respuesta1: undefined,
+            password: undefined,
+            intentos: undefined
+         }
+      });
       return;
    }
 }
@@ -141,67 +145,64 @@ export const register = (req: Request, res: Response): void => {
       return;
    }
    /* Llegados a este punto se asume que tiene todos los campos */
-   conn.get(`SELECT '' FROM usuarios WHERE usuario='${body.usuario}'`,
-      (err: any, row: string) => {
-         if (err) {
-            /* Internal server error */
-            res.status(500).json({ name: err.code, message: err.message });
-         };
-         if (row) {
-            res.status(400).send(`El nombre de usuario ya existe`);
-            return;
-         }
+   let row;
+   try {
+      [row] = connSync.run(`SELECT 1 FROM usuarios WHERE usuario='${body.usuario}'`);
+   } catch (mistake) {
+      /* Internal server error */
+      res.status(500).json({ name: mistake.code, message: mistake.message });
+   }
+   if (!row) {
+      res.status(400).send(`El nombre de usuario ya existe`);
+      return;
+   }
+   const [key, id] = [crypto.randomBytes(16).toString("hex"), crypto.randomBytes(16).toString("hex")];
 
-         const key = crypto.randomBytes(16).toString("hex");
-         const id = crypto.randomBytes(16).toString("hex");
+   try {
+      connSync.run(`INSERT INTO usuarios(
+         \`id\`
+         ,\`nombre\`
+         ,\`apellido\`
+         ,\`password\`
+         ,\`desde\`
+         ,\`usuario\`
+         ,\`pregunta1\`
+         ,\`pregunta2\`
+         ,\`respuesta1\`
+         ,\`respuesta2\`
+         ,\`nivel\`
+         ,\`key\`
+      ) VALUES(
+         '${id}',
+         '${body.nombre}',
+         '${body.apellido}',
+         '${body.password}',
+         date(),
+         '${body.usuario}',
+         ${body.pregunta1},
+         ${body.pregunta2},
+         '${body.respuesta1}',
+         '${body.respuesta2}',
+         1,
+         '${key}'
+      )`);
+      [row] = connSync.run(`SELECT * FROM usuarios WHERE usuario='${body.usuario}'`);
+   } catch (mistake) {
+      res.status(500).json({ name: mistake.code, message: mistake.message });
+      return;
+   }
 
-         conn.serialize(() => {
-            conn.run(`INSERT INTO usuarios(
-               \`id\`
-               ,\`nombre\`
-               ,\`apellido\`
-               ,\`password\`
-               ,\`desde\`
-               ,\`usuario\`
-               ,\`pregunta1\`
-               ,\`pregunta2\`
-               ,\`respuesta1\`
-               ,\`respuesta2\`
-               ,\`nivel\`
-               ,\`key\`
-            ) VALUES(
-               "${id}",
-               "${body.nombre}",
-               "${body.apellido}",
-               "${body.password}",
-               date(),
-               "${body.usuario}",
-               ${body.pregunta1},
-               ${body.pregunta2},
-               "${body.respuesta1}",
-               "${body.respuesta2}",
-               1,
-               "${key}"
-            )`).get(
-               `SELECT * FROM usuarios WHERE usuario='${body.usuario}'`,
-               (err2: any, row2: IUser) => {
-                  if (err2) {
-                     /* Internal server error */
-                     res.status(500).json({ name: err2.code, message: err2.message });
-                     return
-                  }
-                  // makeReg({
-                  //    userId: row2.id,
-                  //    accion: 'register'
-                  // });
-                  res.status(200).send({
-                     response: `Grant access`,
-                     token: hashToken(row2, key)
-                  });// Callback
-               })// Get
-         })// Serialize
-      }// Callback
-   );// Select * from usuarios
+   res.status(200).send({
+      response: `Grant access`,
+      token: hashToken(row, key),
+      user: {
+         ...row,
+         respuesta2: undefined,
+         respuesta1: undefined,
+         password: undefined,
+         intentos: undefined
+      }
+   });
 }
 
 /**
@@ -212,67 +213,64 @@ export const register = (req: Request, res: Response): void => {
  */
 export const updateUserData = (req: Request, res: Response): void => {
    const body = req.body as unknown as IUser;
-   conn.get(`SELECT * FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`,
-      (err: Error, row: IUser) => {
-         /* Error handling */
-         if (err) {
-            res.status(500).json({ message: err.message });
-            // console.log(err);
-            return;
+   let row;
+   try {
+      [row] = connSync.run(`SELECT 1 FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`);
+   } catch (error) {
+      res.status(500).json({ message: error.message });
+      return;
+   }
+   if (!row) {
+      res.status(400).json({ message: `El usuario no existe` })
+      return;
+   }
+
+   let query: string = 'UPDATE usuarios SET ';
+   /*  Loop to add all the fields in the database */
+   const keys = [
+      { name: "usuario", has: true },
+      { name: "nombre", has: true },
+      { name: "apellido", has: true },
+      { name: "password", has: true },
+      { name: "pregunta1", has: false },
+      { name: "respuesta1", has: false },
+      { name: "pregunta2", has: true },
+      { name: "respuesta2", has: true },
+      { name: "nivel", has: false },
+   ]
+   keys.forEach(
+      (key) => {
+         const { name, has } = key
+         if (body[name]) {
+            if (has) query += ` ${name}='${body[name]}',`;
+            else query += ` ${name}=${body[name]},`;
          }
-         /* If the user doesn't exists */
-         if (!row) {
-            res.status(400).json({ message: `El usuario no existe` })
-            return;
-         }
+      }
+   );
+   query.slice(0, -1);
+   query += ` intentos=0 WHERE id='${req.params.id}' COLLATE NOCASE;`
+   /* runs the update query  */
+   try {
+      connSync.run(query);
+      [row] = connSync.run(`SELECT * FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`);
+   } catch (mistake) {
+      res.status(500).json({ name: mistake.code, message: mistake.message });
+      return;
+   }
 
-         let query: string = 'UPDATE usuarios SET ';
-         /*  Loop to add all the fields in the database */
-         const keys = [
-            { name: "usuario", has: true },
-            { name: "nombre", has: true },
-            { name: "apellido", has: true },
-            { name: "password", has: true },
-            { name: "pregunta1", has: false },
-            { name: "respuesta1", has: false },
-            { name: "pregunta2", has: true },
-            { name: "respuesta2", has: true },
-            { name: "nivel", has: false },
-         ]
-         keys.forEach(
-            (key) => {
-               const { name, has } = key
-               if (body[name]) {
-                  if (has) query += ` ${name}='${body[name]}',`;
-                  else query += ` ${name}=${body[name]},`;
-               }
-            }
-         );
+   /* Oll Korrect */
+   res.status(200).json({
+      response: `Usuario actualizado`,
+      token: hashToken(row),
+      user: {
+         ...row,
+         respuesta2: undefined,
+         respuesta1: undefined,
+         password: undefined,
+         intentos: undefined
+      }
+   });
 
-         query += `intentos=0 WHERE id='${req.params.id}' COLLATE NOCASE;`
-
-         /* The query excecution */
-         conn.serialize(() => {
-            conn
-               /* runs the update query  */
-               .run(query)
-               /* Gets the updated info from the database */
-               .get(`SELECT * FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`,
-                  (errGet: any, updatedValues: IUser) => {
-                     /* Error handling */
-                     if (errGet) {
-                        res.status(500).json({ name: errGet.code, message: errGet.message });
-                        return;
-                     }
-                     /* Oll Korrect */
-                     res.status(200).json({
-                        response: `Usuario actualizado`,
-                        token: hashToken(updatedValues)
-                     });// send response
-                  }// get callback
-               )// conn get
-         });// serialize
-      })// initial get
 }// updateUserData
 
 /**
@@ -287,13 +285,14 @@ export const deleteUser = (req: Request, res: Response): void => {
    WHERE
       \`id\`='${req.params.id}';`;
 
-   conn.run(query, (error: any) => {
-      if (error) {
-         res.status(500).json({ name: error.code, message: error.message })
-         return;
-      };
-      res.status(200).json({ message: 'oll korrect' });
-   })
+   try {
+      connSync.run(query);
+   } catch (error) {
+      res.status(500).json({ name: error.code, message: error.message })
+      return;
+   }
+
+   res.status(200).json({ message: 'oll korrect' });
 }
 
 /**
@@ -302,10 +301,10 @@ export const deleteUser = (req: Request, res: Response): void => {
  * @param res The outgoing response
  */
 export const getQuestions = (req: Request, res: Response) => {
-   const query = `SELECT pregunta FROM preguntas`
-   conn.all(query, (error: Error, rows: string[]) => {
-      res.status(200).json(rows);
-   });
+   const query = `SELECT * FROM preguntas`
+
+   const rows: { pregunta: string, id: number } = connSync.run(query);
+   res.status(200).json(rows);
 }
 
 /**
@@ -332,25 +331,33 @@ export const getUserQuestions = (req: Request, res: Response): void => {
    WHERE
       \`usuarios\`.\`usuario\`='${req.params.usuario}' COLLATE NOCASE;`;
 
-   conn.all(query, (error: any, rows: any[]) => {
-      if (error) {
-         res.status(500).json({ name: error.code, message: error.message });
-         return;
-      };
-      if (!rows) {
+   try {
+      const rows: {
+         id_pregunta: number,
+         pregunta1: number,
+         pregunta2: number,
+         usuario: string,
+         id_usuario: string,
+         pregunta: string,
+      }[] = connSync.run(query);
+      if (!rows || !rows.length) {
          res.status(404).json({ message: 'El usuario ingresado no existe.' });
          return;
       }
-      const [pregunta1] = rows.filter(a => a.id_pregunta === a.pregunta1);
-      const [pregunta2] = rows.filter(a => a.id_pregunta === a.pregunta2);
+      const pregunta1 = rows.find(a => a.id_pregunta === a.pregunta1);
+      const pregunta2 = rows.find(a => a.id_pregunta === a.pregunta2);
       /* Sends username, userid, and both questions */
       res.status(200).json({
          usuario: rows[0].usuario,
          id_usuario: rows[0].id_usuario,
-         pregunta1: pregunta1.pregunta,
-         pregunta2: pregunta2.pregunta
+         pregunta1: pregunta1?.pregunta,
+         pregunta2: pregunta2?.pregunta
       })
-   });// all
+
+   } catch (error) {
+      res.status(500).json({ name: error.code, message: error.message });
+      return;
+   }
 }
 
 /**
@@ -364,25 +371,25 @@ export const checkUserQuestions = (req: Request, res: Response): void => {
    const { respuesta1, respuesta2 } = req.body;
    const query = `SELECT * FROM usuarios WHERE id='${id}' COLLATE NOCASE;`;
 
-   conn.get(query,
-      (error: any, row: IUser) => {
-         if (error) {
-            res.status(500).json({ name: error.code, message: error.message })
-            return;
-         };
-         if (row.respuesta1.toLowerCase() === respuesta1.toLowerCase()
-            && row.respuesta2.toLowerCase() === respuesta2.toLowerCase()) {
-            res.status(200).json({
-               response: `Grant access`,
-               token: jwt.sign({
-                  id: row.id,
-                  key: row.key
-               }, 'supersecretkeythatnobodyisgonnaguess')
-            });
-            return;
-         }
-         else res.status(401).json({ message: "Las respuestas no concuerdan" });
-      })
+   let row;
+   try {
+      [row] = connSync.run(query);
+   } catch (error) {
+      res.status(500).json({ name: error.code, message: error.message })
+      return;
+   }
+
+   if (row.respuesta1.toLowerCase() === respuesta1.toLowerCase()
+      && row.respuesta2.toLowerCase() === respuesta2.toLowerCase()) {
+      res.status(200).json({
+         response: `Grant access`,
+         token: jwt.sign({
+            id: row.id,
+            key: row.key
+         }, 'supersecretkeythatnobodyisgonnaguess')
+      });
+      return;
+   } else res.status(401).json({ message: "Las respuestas no concuerdan" });
 }
 
 /**
