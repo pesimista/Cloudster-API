@@ -5,10 +5,37 @@ import sqlite from 'sqlite3';
 import { IUser } from "../models/user";
 import sqliteSync from "sqlite-sync";
 
-export const connSync = sqliteSync.connect('cloudster.db');
+const connection = sqliteSync.connect('cloudster.db');
 
-const sqlite3 = sqlite.verbose();
-export const conn = new sqlite3.Database('./cloudster.db')
+export const connSync = {
+   run: (query: string, args?: any[]) => {
+      const res = connection.run(query, args);
+      const columns = res[0]?.columns;
+      
+      if (res.error || (query.includes('*') && !columns) || !columns) {
+         // console.log('Direct');
+         return res;
+      }
+
+      const [rows] = res;
+      console.log(rows);
+      
+      const keys = rows.columns;
+
+      return rows['values'].map(arr => {
+         let row = {};
+         keys.forEach((key, index) => {
+            row[key] = arr[index]
+         });
+         return row;
+      });
+   }
+};
+
+
+
+// const sqlite3 = sqlite.verbose();
+// export const conn = new sqlite3.Database('./cloudster.db')
 
 /*
 , (err: Error | null) => {
@@ -45,16 +72,19 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
       return;
    }
    console.log(decoded.key);
-   
-   conn.get(`SELECT '' FROM usuarios WHERE id='${decoded.id.trim()}' AND key='${decoded.key.trim()}' COLLATE NOCASE`,
-      (error: any, row) => {
-         if (error || !row) {
-            res.status(401).json({ message: 'Unanthorized - ' + error?.message   });
-            return;
-         }
-         return next();
-      });
 
+   try {
+      const [row] = connSync.run(`SELECT '' FROM usuarios WHERE id='${decoded.id.trim()}' AND key='${decoded.key.trim()}' COLLATE NOCASE`);
+      if (!row) {
+         res.status(401).json({ message: 'Unanthorized ' });
+         return;
+      }
+
+      return next();
+   } catch (error) {
+      res.status(401).json({ message: 'Unanthorized - ' + error?.message });
+      return;
+   }
 }
 
 export const getTokenKey = (token: string = ''): IUser => {

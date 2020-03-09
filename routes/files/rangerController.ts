@@ -2,11 +2,10 @@ import { Request, Response } from "express";
 import fs, { PathLike, Dirent } from "fs";
 import path from "path";
 import { IFile } from "../../models/files";
-import { conn, connSync, getTokenKey } from "../../util/util";
-import { IUser } from "../../models/user";
+import { connSync, getTokenKey } from "../../util/util";
 
 /* The saparator */
-const _ = (process.platform === 'win32' ? '\\' : '/');
+export const _ = (process.platform === 'win32' ? '\\' : '/');
 /* Defines whether or not the data base is being updated */
 export let updating: boolean = false;
 /* The directory to work with */
@@ -29,31 +28,38 @@ export const initializeServer = (): void => {
 
    /* The files that are currently active in the folder */
    const files = loadFiles(cwd);
-   conn.each(`SELECT ino from archivos`, (err: Error, rowIno: { ino: number }) => {
-      const selected = files.find(
-         f => f.ino.trim() === rowIno.ino.toString().trim()
-      )
+
+   const rows: number[] = connSync.run(`SELECT ino from archivos`)
+      .map((ino: { ino: number }) => ino.ino);
+
+   rows.forEach(currentIno => {
+      const selected: IFile = <IFile>files.find(
+         f => f.ino === currentIno
+      );
+
       /* If the file doesn't exist in the current folder, marks it as unavailable */
       if (!selected) {
-         deleteFile(rowIno.ino);
+         deleteFileSync(currentIno);
          return;
       }
-      /* If it is, the data gets updated*/
-      conn.run(`
+
+      /* If it is, the data gets updated */
+      const update = connSync.run(`
       UPDATE archivos SET
-         name = '${selected.name}'
-         , ext = '${selected.ext}'
-         , isFile = ${selected.isFile ? 1 : 0}
-         , fullSize = ${selected.fullSize}
-         , size = '${selected.size}'
-      WHERE ino = ? COLLATE NOCASE`
-         , rowIno.ino
-         // , (e) => console.log('\x1b[34mUpdate \x1b[36mASYNC\x1b[0m ' + (e ? e.message : rowIno.ino))
-      );
-   });
-
-   conn.all(`SELECT ino FROM archivos;`, (error: Error, row: IFile[]) => checkFiles(error, row, files));
-
+      name = '${selected.name}'
+      , ext = '${selected.ext}'
+      , isFile = ${selected.isFile ? 1 : 0}
+      , fullSize = ${selected.fullSize}
+      , size = '${selected.size}'
+      WHERE ino = ${currentIno} COLLATE NOCASE
+      `);
+      if (update.error) {
+         console.log('\x1b[31mUpdate \x1b[36m SYNC\x1b[0m ');
+         return;
+      }
+      console.log('\x1b[34mUpdate \x1b[36m SYNC\x1b[0m ' + currentIno);
+   });//foreach
+   checkFiles(rows, files);
 }
 
 /**
@@ -63,23 +69,21 @@ export const initializeServer = (): void => {
  * @param rows the retrieved rows by the query
  * @param files the file list that will be used as reference
  */
-const checkFiles = (error: Error, rows: IFile[], files: IFile[]): void => {
+const checkFiles = (rows: number[], files: IFile[], error?: Error): void => {
    if (error) {
       // console.log("\x1b[31mERROR\t\x1b[0m " + error.message);
       return;
    }
-
    files.forEach(
       file => {
-         const selected = rows.find(
-            (row: IFile) => row.ino.toString().trim() === file.ino.trim()
+         const selected: number = <number>rows.find(
+            row => row === file.ino
          );
-         if (!selected)
-            insertFile(file);
+         if (!selected) {
+            insertFileSync(file);
+         }
       }
    );
-
-   updating = false;
 }
 
 /**
@@ -89,7 +93,7 @@ const checkFiles = (error: Error, rows: IFile[], files: IFile[]): void => {
  * @param dep The ino corresponding to the directory
  * @param nivel The Hierarchy to be assign to the file
  */
-const loadFiles = (dir: PathLike, dep: string = '0', nivel: number = 1): IFile[] => {
+const loadFiles = (dir: PathLike, dep: number = 0, nivel: number = 1): IFile[] => {
    let files: IFile[] = [];
    let unprocessedFiles: Dirent[];
    try {
@@ -122,7 +126,7 @@ const loadFiles = (dir: PathLike, dep: string = '0', nivel: number = 1): IFile[]
  * @param dep The ino corresponding to the directory
  * @param nivel The Hierarchy to be assign to the file
  */
-const generateFile = (fileName: string, dir: string, dep: string | number, nivel: number = 1): IFile => {
+const generateFile = (fileName: string, dir: string, dep: number, nivel: number = 1): IFile => {
    let stat;
    try {
       stat = fs.statSync(dir + _ + fileName);
@@ -143,7 +147,7 @@ const generateFile = (fileName: string, dir: string, dep: string | number, nivel
       path.parse(fileName).ext === '' ?
          '~' : path.parse(fileName).ext.substring(1);
    const file: IFile = {
-      ino: stat.ino.toString(),
+      ino: stat.ino,
       name: fileName,
       ext,
       isFile: stat.isFile(),
@@ -151,7 +155,7 @@ const generateFile = (fileName: string, dir: string, dep: string | number, nivel
       birthtime: stat.birthtime,
       fullSize: stat.size,
       size: parseSize(stat.size),
-      dependency: dep.toString(),
+      dependency: dep,
       nivel
    };
 
@@ -164,29 +168,30 @@ const generateFile = (fileName: string, dir: string, dep: string | number, nivel
  * =====================
  */
 
-const insertFile = (file: IFile): void => {
-   const query = insertQuery(file);
-   // console.log(query)
-   // console.log("------------------------------")
-   conn.run(query/*, (e) => console.log('\x1b[33mINSERT \x1b[36mASYNC\x1b[0m ' + (e ? e.message : file.ino)) */);
-}
-const insertFileSync = (file: IFile): boolean => {
-   const query = insertQuery(file);
-   try {
-      connSync.run(query);
-      // console.log('\x1b[33mINSERT \x1b[36mSYNC \x1b[0m ' + file.ino);
-      return true;
-   } catch (e) {
-      // console.log("\x1b[31mERROR \x1b[36mSYNC \x1b[0m " + e.message);
+// const insertFile = (file: IFile): void => {
+//    const query = insertQuery(file);
+//    console.log(query);
+//    console.log("------------------------------")
+//    conn.run(query, (e) => console.log('\x1b[33mINSERT \x1b[36mASYNC\x1b[0m ' + (e ? e.message : file.ino)));
+// }
+const insertFileSync = (file: IFile, user: string = 'Cloudster'): boolean => {
+   const query = insertQuery(file, user);
+   const res = connSync.run(query);
+   if (res.error) {
+      console.log("\x1b[32mUPDATE \x1b[36m SYNC \x1b[0m " + file.ino);
+      console.error(res.error)
       return false;
    }
+   console.log('\x1b[33mINSERT \x1b[36m SYNC \x1b[0m ' + file.ino + ' ' + file.name);
+   return true;
+
 
 }
 /**
  * Returns the query to update the file reg
  * @param file fiel
  */
-const insertQuery = (file: IFile): string => {
+const insertQuery = (file: IFile, user: string = 'Cloudster'): string => {
    return `
       INSERT INTO archivos (
          ino
@@ -199,6 +204,7 @@ const insertQuery = (file: IFile): string => {
          , size
          , dependency
          , nivel
+         , usuario
       )
       VALUES (
          ${file.ino}
@@ -209,8 +215,9 @@ const insertQuery = (file: IFile): string => {
          , '${file.birthtime}'
          , ${file.fullSize}
          , '${file.size}'
-         , '${file.dependency}'
+         , ${file.dependency}
          , ${file.nivel}
+         , '${user}'
       );`;
 }
 /**
@@ -218,47 +225,51 @@ const insertQuery = (file: IFile): string => {
  * it just marks it as unavailable
  * @param ino
  */
-const deleteFile = (ino: string | number): void => {
-   // console.log(ino);
-   conn.run(`
-       UPDATE archivos SET
-         available = 0
-      WHERE ino = ${+ino} COLLATE NOCASE`
-      // ,(e) => console.log('\x1b[31mDelete\x1b[36m ' + (e ? e.message : ino))
-   );
-   conn.all(`SELECT ino FROM archivos WHERE dependency=? COLLATE NOCASE`
-      , [+ino]
-      , (err, rows: IFile) => deleteFile(rows.ino)
-   );
-}
+// const deleteFile = (ino: string | number): void => {
+//    // console.log(ino);
+//    conn.run(`
+//        UPDATE archivos SET
+//          available = 0
+//       WHERE ino = ${+ino} COLLATE NOCASE`
+//       // ,(e) => console.log('\x1b[31mDelete\x1b[36m ' + (e ? e.message : ino))
+//    );
+//    conn.all(`SELECT ino FROM archivos WHERE dependency=? COLLATE NOCASE`
+//       , [+ino]
+//       , (err, rows: IFile) => deleteFile(rows.ino)
+//    );
+// }
 
 /**
  * Doesn't actually remove the file from the server,
  * it just marks it as unavailable
  * @param ino
  */
-const deleteFileSync = (ino: string | number): boolean => {
-   try {
-      connSync.run(`
-       UPDATE archivos SET
-         available = 0
-      WHERE ino = ? COLLATE NOCASE`
-         , [+ino]
-      );
-      const dep: IFile[] = connSync.run(`
-         SELECT ino FROM archivos WHERE dependency=? COLLATE NOCASE`
-         , [+ino]
-      );
+const deleteFileSync = (ino: number): boolean => {
 
-      // console.log('\x1b[31mDelete \x1b[36mSYNC \x1b[0m ' + ino)
-      dep.forEach(file => {
-         deleteFileSync(file.ino);
-      });
-      return true;
-   } catch (e) {
-      // console.log('\x1b[31mDelete \x1b[36mSYNC \x1b[0m ' + (e ? e.message : ino))
-      return false;
-   }
+   // let res = connSync.run(`
+   //    UPDATE archivos SET
+   //       available = 0
+   //    WHERE ino = ? COLLATE NOCASE`
+   //    , [+ino]
+   // );
+
+   let res = connSync.run(`
+      DELETE FROM 
+         archivos
+      WHERE 
+         ino = ${ino}`
+   );
+   if (res.error) return false;
+   console.log('\x1b[32mDELETE \x1b[36mSYNC \x1b[0m ' + ino)
+
+   const dep: IFile[] = connSync.run(`
+      SELECT ino FROM archivos WHERE dependency=? COLLATE NOCASE`
+      , [+ino]
+   );
+   dep.forEach(file => {
+      deleteFileSync(file.ino);
+   });
+   return true;
 }
 
 
@@ -277,12 +288,26 @@ const deleteFileSync = (ino: string | number): boolean => {
  */
 export const getFilesInDirectory = (req: Request, res: Response): void => {
    const [nivel, file] = verifyPermission(req, res);
+
    if (nivel === -1)
       return;
 
-   const files: IFile[] = connSync
-      .run(
-         `SELECT * FROM
+   const response = connSync.run(
+      `UPDATE archivos SET
+         lastAccessed='${new Date()}'
+      WHERE
+         dependency=?
+      AND
+         nivel<=?
+      AND
+         available=1
+      COLLATE NOCASE`
+      , [file.ino, nivel]
+   );
+   // console.log(response)
+
+   const files: IFile[] = connSync.run(
+      `SELECT * FROM
             archivos
          WHERE
             dependency=?
@@ -291,12 +316,11 @@ export const getFilesInDirectory = (req: Request, res: Response): void => {
          AND
             available=1
          COLLATE NOCASE`
-         , [file.ino, nivel]
-      );
-
+      , [file.ino, nivel]
+   );
 
    res.status(200).json(files.map(f => {
-      return { ...f, isFile: +f.isFile !== 0 ? true : false };
+      return { ...f, isFile: f.isFile ? true : false };
    }));
 }
 
@@ -311,6 +335,29 @@ export const getFileInfo = (req: Request, res: Response): void => {
       return;
 
    res.status(200).json(file);
+}
+
+/**
+ * Downloads the file
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
+export const downloadFile = (req: Request, res: Response): void => {
+   const [nivel, file] = verifyPermission(req, res);
+   if (nivel === -1) {
+      return;
+   }
+   if (!file.isFile) {
+      res.status(400).send();
+      return;
+   }
+   const route = getFileFullPath(file);
+   const response = connSync.run(`
+      UPDATE archivos SET
+         lastChanged='${new Date()}'
+      WHERE ino=${file.ino};
+   `);
+   res.status(200).download(route);
 }
 
 /**
@@ -331,30 +378,30 @@ export const test = (req: Request, res: Response): void => {
  */
 export const postFile = (req: Request, res: Response): void => {
    const ino = parseInt(req.params.ino, 10);
+   const token = getTokenKey(req.headers.authorization);
    if (isNaN(ino)) {
       res.status(400).send({ message: 'El ino no es compatible' });
       return;
    };
 
-   const folder = findFile(ino);   
-   
-   const baseDir = !req.params.ino ? getFileFullPath(folder) : cwd;
-   const newName: string = baseDir + _ + req.file.originalname;
+   const folder = findFile(ino);
+
+
+   const baseDir = ino !== 0 ? getFileFullPath(folder) : cwd;
+
+   const final = setNewName(req.file.originalname, ino);
+   const newName: string = baseDir + _ + final;
 
    try {
-      fs.accessSync(req.file.path);
       fs.renameSync(req.file.path, newName);
-
       try {
          fs.statSync(newName);
       }
       catch (e) {
-         // console.log(`no such file or directory, stat ${newName}`);
-         res.status(500).json({ message: e.message });
+         res.status(500).json(e);
          return;
       }
-
-      insertFileSync(generateFile(req.file.originalname, baseDir, req.params.ino, -1));
+      insertFileSync(generateFile(final, baseDir, ino, -1), token.id);
       res.status(200).json({ message: "Recibido" });
 
    } catch (e) {
@@ -365,7 +412,7 @@ export const postFile = (req: Request, res: Response): void => {
          is.on('end', () => {
             fs.unlinkSync(req.file.path);
             const response = insertFileSync(
-               generateFile(req.file.originalname, baseDir, req.params.ino, -1)
+               generateFile(final, baseDir, ino, -1), token.id
             );
             if (!response)
                return res.status(500)
@@ -381,18 +428,80 @@ export const postFile = (req: Request, res: Response): void => {
 }
 
 /**
+ * Handles the entire process of uploading a new file to the server
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
+export const postFolder = (req: Request, res: Response): void => {
+   const [nivel, file] = verifyPermission(req, res);
+   const token = getTokenKey(req.headers.authorization);
+   if (nivel === -1) {
+      return;
+   }
+   if (file.isFile) {
+      res.status(400).json({ message: 'No se puede crear una carpeta dentro de un archivo' });
+      return;
+   }
+   const route = file.ino ? getFileFullPath(file) : cwd;
+   const newName = setNewName(req.body.name, file.ino);
+   try {
+      fs.mkdirSync(route + _ + newName, { recursive: true });
+   } catch (error) {
+      res.status(400).json({ ...error });
+   }
+   insertFileSync(generateFile(newName, route, file.ino, -1), token.id);
+   res.status(200).json({ message: `carpeta ${newName} creada en ${file.name}` })
+
+}
+
+/**
  * Doesn't actually changes the file but updates its access level
  * @param req The incoming request
  * @param res The outgoing response
  */
 export const putFile = (req: Request, res: Response): void => {
-   const { nivel } = req.body as IFile;
-   connSync.run(`
+
+   const ino = +req.params.ino;
+   if (isNaN(ino) || ino === 0) {
+      res.status(400).json();
+      return;
+   }
+
+   const [userLevel, file] = verifyPermission(req, res);
+   const { nivel, name = '' } = req.body as IFile;
+
+   let response;
+   if (name) {
+      const ext = path.extname(name);
+
+      const originalname = getFileFullPath(file);
+      const final = setNewName(name, ino);
+      const newName: string = path.dirname(originalname) + _ + final;
+      try {
+         fs.renameSync(originalname, newName);
+      } catch (error) {
+         res.status(500).json({ ...error });
+         return;
+      }
+
+      response = connSync.run(`
+         UPDATE archivos SET
+            name='${name}',
+            ext='${ext.substr(1)}'
+         WHERE ino=${ino};
+      `);
+      if (response.error) res.status(500).json(response);
+   }
+
+   response = connSync.run(`
       UPDATE archivos SET
+         lastModified='${new Date()}',
          nivel=${nivel}
-      WHERE ino=${req.params.ino};
+      WHERE ino=${ino};
    `);
-   res.status(200).json({ message: 'Oll korrect' });
+   if (response.error) res.status(500).json(response);
+
+   else res.status(200).json({ message: 'Oll korrect' });
 }
 /**
  * Doesn't actually deletes the file but marks it as unavailable
@@ -400,7 +509,8 @@ export const putFile = (req: Request, res: Response): void => {
  * @param res The outgoing response
  */
 export const removeFile = (req: Request, res: Response): void => {
-   deleteFileSync(req.params.ino);
+   if (isNaN(+req.params.ino)) return;
+   deleteFileSync(+req.params.ino);
 }
 
 
@@ -419,7 +529,7 @@ export const setDirectory = (dir: string): boolean => {
    // console.log("UPDATING")
 
    initializeServer();
-
+   debugger;
    return true;
    // try {
    //    fs.accessSync(dir);
@@ -458,16 +568,18 @@ export const setDirectory = (dir: string): boolean => {
  * @param res The outgoing response
  */
 const verifyPermission = (req: Request, res: Response): any[] => {
-   const { key } = getTokenKey(req.header('Authorization'));
-   const [{ nivel }] = connSync
-      .run(
-         `SELECT nivel FROM usuarios WHERE key=? COLLATE NOCASE`
-         , [key]
-      );
+   const { key } = getTokenKey(req.headers.authorization);
+   // const nivel = 5;
+
+   const [{ nivel }] = connSync.run(
+      `SELECT nivel FROM usuarios WHERE key=? COLLATE NOCASE`
+      , [key]
+   );
 
    if (!req.params.ino) return [nivel, { ino: 0 }]
 
    const file = findFile(req.params.ino);
+
    if (!file) {
       res.status(404).send();
       return [-1, {}];
@@ -506,11 +618,50 @@ export const parseDependency = (file: IFile): string => {
  */
 export const findFile = (ino: string | number = 0): IFile => {
    //    /* Wait for the file to be found ¯\_(ツ)_/¯ */
-   console.log(connSync.run(`SELECT * FROM archivos WHERE ino=${ino} AND available=1`));
-   const [file] = connSync.run(`SELECT * FROM archivos WHERE ino=${ino} AND available=1`);
+   if (+ino === 0) {
+      return {
+         id: 0,
+         ino: 0,
+         name: 'root',
+         url: '',
+         ext: '',
+         isFile: false,
+         available: true,
+         birthtime: new Date(1999, 9, 6),
+         fullSize: 0,
+         size: "0.00 Bytes",
+         nivel: 1
+      }
+   }
+
+   const [file]: IFile[] = connSync.run(`SELECT * FROM archivos WHERE ino=${ino} AND available=1`);
 
    if (!file) return file;
-   return { ...file, isFile: file.isFile !== 0 ? true : false };
+   return {
+      ...file,
+      isFile: file.isFile ? true : false,
+      available: file.available ? true : false
+   };
+}
+
+const setNewName = (fileName: string, ino: number = 0): string => {
+   const _ext: string = path.extname(fileName);
+   const nombre: string = path.basename(fileName, _ext);
+
+
+   const exist = (a: string): number => {
+      const result = connSync.run(`SELECT ino FROM archivos WHERE name=? AND dependency=?`
+         , [a, ino]);
+      return result.length;
+   }
+
+   let i = 0;
+   let nuevo = `${nombre}${_ext}`;
+
+   while (exist(nuevo)) {
+      nuevo = `${nombre}_${++i}${_ext}`;
+   }
+   return nuevo;
 }
 
 /**

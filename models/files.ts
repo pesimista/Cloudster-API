@@ -1,6 +1,6 @@
 export interface IFile {
    id?: number;
-   ino: string;
+   ino: number;
    name: string;
    url?: string;
    ext: string;
@@ -12,6 +12,6 @@ export interface IFile {
    birthtime: Date;
    fullSize: number;
    size: string;
-   dependency: string;
+   dependency?: number;
    nivel: number;
 }

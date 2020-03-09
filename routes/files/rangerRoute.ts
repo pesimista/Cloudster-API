@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import { Authorization } from "../../util/util";
-import { getFilesInDirectory, getFileInfo, test, postFile, putFile } from "./rangerController";
+import { getFilesInDirectory, getFileInfo, test, postFile, putFile, downloadFile, postFolder } from "./rangerController";
 import multer from "multer";
 
 // var express = require('express');
@@ -11,10 +11,12 @@ const upload = multer({ dest: "temp/" });
 ranger.get('/', Authorization, getFilesInDirectory);
 ranger.get('/test', Authorization, test);
 ranger.get('/:ino', Authorization, getFileInfo);
+ranger.get('/:ino/download', Authorization, downloadFile);
 ranger.get('/:ino/files', Authorization, getFilesInDirectory);
 
 /* POST a file */
-ranger.post('/:ino', Authorization, upload.single('file'), postFile);
+ranger.post('/:ino', upload.single('file'), postFile);
+ranger.post('/:ino/folder', postFolder);
 
 /* PUT a file */
 ranger.put('/:ino', Authorization, putFile);

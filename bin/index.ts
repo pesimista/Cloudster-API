@@ -14,7 +14,7 @@ const debug = debugModule('cloudster:server');
 /**
  * Get port from environment and store in Express.
  */
-const port = normalizePort(process.env.PORT || '3000');
+const port = normalizePort(process.env.PORT || '1234');
 app.set('port', port);
 
 /**
@@ -78,7 +78,8 @@ function onError(error: any) {
 }
 
 // console.clear();
-setDirectory(__dirname);
+console.log(__dirname);
+setDirectory("D:\\User\\Documentos\\git\\Cloudster-API\\temp");
 
 /**
  * Event listener for HTTP server "listening" event.
