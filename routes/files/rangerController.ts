@@ -265,7 +265,7 @@ const deleteFileSync = (ino: number): boolean => {
    const dep: IFile[] = connSync.run(`
       SELECT ino FROM archivos WHERE dependency=? COLLATE NOCASE`
       , [+ino]
-   );
+   ) as unknown as IFile[];
    dep.forEach(file => {
       deleteFileSync(file.ino);
    });
@@ -317,7 +317,7 @@ export const getFilesInDirectory = (req: Request, res: Response): void => {
             available=1
          COLLATE NOCASE`
       , [file.ino, nivel]
-   );
+   ) as unknown as IFile[];
 
    res.status(200).json(files.map(f => {
       return { ...f, isFile: f.isFile ? true : false };
@@ -574,7 +574,7 @@ const verifyPermission = (req: Request, res: Response): any[] => {
    const [{ nivel }] = connSync.run(
       `SELECT nivel FROM usuarios WHERE key=? COLLATE NOCASE`
       , [key]
-   );
+   ) as unknown as IFile[];
 
    if (!req.params.ino) return [nivel, { ino: 0 }]
 
@@ -634,7 +634,7 @@ export const findFile = (ino: string | number = 0): IFile => {
       }
    }
 
-   const [file]: IFile[] = connSync.run(`SELECT * FROM archivos WHERE ino=${ino} AND available=1`);
+   const [file]: IFile[] = connSync.run(`SELECT * FROM archivos WHERE ino=${ino} AND available=1`) as unknown as IFile[];
 
    if (!file) return file;
    return {

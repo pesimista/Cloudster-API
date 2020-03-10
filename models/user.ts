@@ -14,3 +14,13 @@ export interface IUser {
    confirmpassword?: string;
    [key: string]: any;
 }
+
+export interface IPreguntas {
+   id: number;
+   pregunta: string;
+   id_pregunta?: number;
+   pregunta1?: number;
+   pregunta2?: number;
+   usuario?: string;
+   id_usuario?: string;
+}

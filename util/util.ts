@@ -1,14 +1,15 @@
 /// <reference types="./sqlite-sync"/>
-import { Request, Response, NextFunction } from "express";
+import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import sqlite from 'sqlite3';
-import { IUser } from "../models/user";
 import sqliteSync from "sqlite-sync";
+import { IResult } from "../models/result";
+import { IUser } from "../models/user";
 
 const connection = sqliteSync.connect('cloudster.db');
 
 export const connSync = {
-   run: (query: string, args?: any[]) => {
+   
+   run: (query: string, args?: any[]): IResult => {
       const res = connection.run(query, args);
       const columns = res[0]?.columns;
       
@@ -74,7 +75,13 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
    console.log(decoded.key);
 
    try {
-      const [row] = connSync.run(`SELECT '' FROM usuarios WHERE id='${decoded.id.trim()}' AND key='${decoded.key.trim()}' COLLATE NOCASE`);
+      const rows = connSync.run(`SELECT '' FROM usuarios WHERE id='${decoded.id.trim()}' AND key='${decoded.key.trim()}' COLLATE NOCASE`) ;
+      if(rows.error){
+         res.status(500).json(rows.error);
+         return;
+      }
+      const [row] = rows as unknown as any[];
+
       if (!row) {
          res.status(401).json({ message: 'Unanthorized ' });
          return;
