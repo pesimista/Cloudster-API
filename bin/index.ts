@@ -78,8 +78,6 @@ function onError(error: any) {
 }
 
 // console.clear();
-console.log(__dirname);
-setDirectory("D:\\User\\Documentos\\git\\Cloudster-API\\temp");
 
 /**
  * Event listener for HTTP server "listening" event.

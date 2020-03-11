@@ -4,15 +4,16 @@ import jwt from "jsonwebtoken";
 import sqliteSync from "sqlite-sync";
 import { IResult } from "../models/result";
 import { IUser } from "../models/user";
+import path from "path";
 
 const connection = sqliteSync.connect('cloudster.db');
 
 export const connSync = {
-   
+
    run: (query: string, args?: any[]): IResult => {
       const res = connection.run(query, args);
       const columns = res[0]?.columns;
-      
+
       if (res.error || (query.includes('*') && !columns) || !columns) {
          // console.log('Direct');
          return res;
@@ -20,7 +21,7 @@ export const connSync = {
 
       const [rows] = res;
       console.log(rows);
-      
+
       const keys = rows.columns;
 
       return rows['values'].map(arr => {
@@ -56,7 +57,7 @@ export const connSync = {
  * @param next The function to be called after the authorization is validated
  */
 export const Authorization = (req: Request, res: Response, next: NextFunction) => {
-   const token = req.header('Authorization');
+   const token = req.header('Authorization') || 'bearer ' + req.query.token;
    if (!token || !token.toLocaleLowerCase().startsWith('bearer ')) {
       res.status(401).send('1');
       return;
@@ -68,15 +69,27 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
       return res.status(500).json({ message: error.message });
    }
 
-   if (!decoded.key || !decoded.id) {
-      res.status(401).send('2');
+   if (!decoded && !req.headers.origin) {
+      const dir = path.dirname(__dirname);
+      res.status(200).sendFile(`${dir}${_}pages${_}notFound.html`);
+      return;
+   }
+
+
+   try {
+      if (!decoded.key || !decoded.id) {
+         res.status(401).send('2');
+         return;
+      }
+   } catch (error) {
+      res.status(400).json({ ...error });
       return;
    }
    console.log(decoded.key);
 
    try {
-      const rows = connSync.run(`SELECT '' FROM usuarios WHERE id='${decoded.id.trim()}' AND key='${decoded.key.trim()}' COLLATE NOCASE`) ;
-      if(rows.error){
+      const rows = connSync.run(`SELECT '' FROM usuarios WHERE id='${decoded.id.trim()}' AND key='${decoded.key.trim()}' COLLATE NOCASE`);
+      if (rows.error) {
          res.status(500).json(rows.error);
          return;
       }
@@ -113,3 +126,5 @@ export const randomUpper = (value: string): string => {
 
    return toReturn;
 };
+/** The saparator */
+export const _ = (process.platform === 'win32' ? '\\' : '/');

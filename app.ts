@@ -1,12 +1,14 @@
-import express, { Application, Request, Response, NextFunction } from "express";
-import logger from "morgan";
 import compression from "compression";
+import express, { Application, NextFunction, Request, Response } from "express";
 import helmet from "helmet";
-
-import indexRouter from "./routes/index.route";
-import usersRouter from "./routes/users/usersRoute";
+import logger from "morgan";
+import { setDirectory } from "./routes/files/rangerController";
 import filesRouter from "./routes/files/rangerRoute";
+import indexRouter from "./routes/index.route";
 import { getQuestions } from "./routes/users/usersController";
+import usersRouter from "./routes/users/usersRoute";
+import { _ } from "./util/util";
+
 
 /* Instantiate app */
 const app: Application = express();
@@ -90,5 +92,5 @@ const getColor = (method: string) => {
    return color + method.toUpperCase();
 }
 
-
+setDirectory(__dirname + _ + 'temp');
 export default app;

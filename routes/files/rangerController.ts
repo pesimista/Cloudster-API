@@ -2,10 +2,8 @@ import { Request, Response } from "express";
 import fs, { PathLike, Dirent } from "fs";
 import path from "path";
 import { IFile } from "../../models/files";
-import { connSync, getTokenKey } from "../../util/util";
+import { connSync, getTokenKey, _ } from "../../util/util";
 
-/* The saparator */
-export const _ = (process.platform === 'win32' ? '\\' : '/');
 /* Defines whether or not the data base is being updated */
 export let updating: boolean = false;
 /* The directory to work with */
@@ -361,6 +359,38 @@ export const downloadFile = (req: Request, res: Response): void => {
 }
 
 /**
+ * A the file
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
+export const viewFile = (req: Request, res: Response): void => {
+   console.log(req.headers)
+   const [, file] = verifyPermission(req, res, false);
+
+   console.log(file);
+   if (file.status && file.status === 404) {
+      const dir = path.dirname(path.dirname(__dirname));
+      res.status(200).sendFile(`${dir}${_}pages${_}notFound.html`);
+      return;
+   }
+   else if (file.status === 401) {
+      res.status(200).send();
+      return;
+   }
+   if (!file.isFile) {
+      res.status(400).send();
+      return;
+   }
+   const route = getFileFullPath(file);
+   connSync.run(`
+      UPDATE archivos SET
+         lastChanged='${new Date()}'
+      WHERE ino=${file.ino};
+   `);
+   res.status(200).sendFile(route);
+}
+
+/**
  * Retrieves the info for a spefic file
  * @param req The incoming request
  * @param res The outgoing response
@@ -478,6 +508,7 @@ export const putFile = (req: Request, res: Response): void => {
       const final = setNewName(name, ino);
       const newName: string = path.dirname(originalname) + _ + final;
       try {
+         console.log(fs.existsSync(originalname).toString());
          fs.renameSync(originalname, newName);
       } catch (error) {
          res.status(500).json({ ...error });
@@ -567,8 +598,8 @@ export const setDirectory = (dir: string): boolean => {
  * @param req The incoming request
  * @param res The outgoing response
  */
-const verifyPermission = (req: Request, res: Response): any[] => {
-   const { key } = getTokenKey(req.headers.authorization);
+const verifyPermission = (req: Request, res: Response, sendRes = true): any[] => {
+   const { key } = getTokenKey(req.headers.authorization || 'bearer ' + req.query.token);
    // const nivel = 5;
 
    const [{ nivel }] = connSync.run(
@@ -581,12 +612,14 @@ const verifyPermission = (req: Request, res: Response): any[] => {
    const file = findFile(req.params.ino);
 
    if (!file) {
-      res.status(404).send();
-      return [-1, {}];
+      if (sendRes)
+         res.status(404).send();
+      return [-1, { status: 404 }];
    };
    if (file.nivel > nivel) {
-      res.status(401).json({ message: `No tiene acceso a este archivo` });
-      return [-1, {}];
+      if (sendRes)
+         res.status(401).json({ message: `No tiene acceso a este archivo` });
+      return [-1, { status: 401 }];
    }
    return [nivel, file];
 }
@@ -683,4 +716,3 @@ const parseSize = (size: number): string => {
    size = size / 1024;
    return `${size.toFixed(2)} GB`
 }
-
