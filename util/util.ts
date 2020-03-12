@@ -85,7 +85,6 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
       res.status(400).json({ ...error });
       return;
    }
-   console.log(decoded.key);
 
    try {
       const rows = connSync.run(`SELECT '' FROM usuarios WHERE id='${decoded.id.trim()}' AND key='${decoded.key.trim()}' COLLATE NOCASE`);
