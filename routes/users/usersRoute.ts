@@ -1,15 +1,6 @@
 import express from "express";
-import {
-   login
-   , getUsers
-   , register
-   , updateUserData
-   , getUserQuestions
-   , deleteUser
-   , checkUserQuestions
-   , checkUser
-} from "./usersController";
 import { Authorization } from "../../util/util";
+import { checkUser, checkUserQuestions, deleteUser, getUserQuestions, getUsers, login, register, updateUserData } from "./usersController";
 
 // var express = require('express');
 const router = express.Router();

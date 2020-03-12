@@ -88,7 +88,7 @@ export const login = (req: Request, res: Response): void => {
          WHERE
       usuario='${body.usuario}'
       COLLATE NOCASE;
-   `) ;
+   `);
 
    if (result.error) {
       res.status(500).json({ name: 'SQLite error', message: result.error });

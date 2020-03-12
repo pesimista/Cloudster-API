@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import fs, { PathLike, Dirent } from "fs";
+import fs, { Dirent, PathLike } from "fs";
 import path from "path";
 import { IFile } from "../../models/files";
 import { connSync, getTokenKey, _ } from "../../util/util";
