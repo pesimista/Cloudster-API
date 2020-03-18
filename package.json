@@ -1,37 +1,62 @@
 {
-  "name": "cr-back",
-  "version": "1.0.0",
-  "description": "This is the back end of out application, Cognitive Realm, A simple, though overcomplicated (For academic purposes), way to share files in your local network.",
-  "main": "server.js",
-  "bin": "server.js",
-  "dependencies": {
-    "body-parser": "^1.19.0",
-    "express": "^4.17.1",
-    "multer": "^1.4.1",
-    "request": "^2.88.0",
-    "sqlite3": "^4.0.9"
-  },
-  "devDependencies": {},
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
-  },
-  "keywords": [
-    "Oropeza"
-  ],
-  "author": "MezzMar, Diomes",
-  "license": "ISC",
-  "pkg": {
-    "scripts": [
-      "lib/index.js",
-      "lib/sqlite3.js",
-      "lib/trace.js",
-      "lib/binding/*"
-    ],
-    "assets": [
-      "lib/binding/*",
-      "build/*",
-      "build/**/*"
-    ]
-  }
+   "name": "cloudster",
+   "version": "1.0.0",
+   "description": "This is the back end of out application, Cognitive Realm, A simple, though overcomplicated (For academic purposes), way to share files in your local network.",
+   "private": true,
+   "main": "./bin/index.ts",
+   "scripts": {
+      "prebuild": "tslint -c tslint.json -p tsconfig.json --fix",
+      "build": "tsc",
+      "prestart": "npm run build",
+      "test": "echo \"Error: no test specified\" && exit 1",
+      "start": "node ./bin/index.ts",
+      "dev": "SET DEBUG=helloworld:* & nodemon ./bin/index.ts"
+   },
+   "repository": {
+      "type": "git",
+      "url": "git+https://github.com/MezzMar/Cloudster-API.git"
+   },
+   "keywords": [
+      "Oropeza",
+      "Luis",
+      "Fernandez",
+      "cloud",
+      "files",
+      "sharing",
+      "LAN"
+   ],
+   "authors": [
+      "Gary Nadir (MezzMar_)",
+      "Diego Lopez (Diomes)"
+   ],
+   "license": "ISC",
+   "dependencies": {
+      "@types/compression": "^1.7.0",
+      "@types/debug": "^4.1.5",
+      "@types/helmet": "0.0.45",
+      "@types/multer": "^1.4.2",
+      "@types/sqlite3": "^3.1.6",
+      "compression": "^1.7.4",
+      "cookie-parser": "~1.4.4",
+      "debug": "~2.6.9",
+      "express": "~4.16.1",
+      "helmet": "^3.21.3",
+      "http-errors": "~1.6.3",
+      "jsonwebtoken": "^8.5.1",
+      "morgan": "~1.9.1",
+      "multer": "^1.4.2",
+      "sqlite-sync": "^0.3.9"
+   },
+   "devDependencies": {
+      "@types/bcryptjs": "^2.4.2",
+      "@types/express": "^4.17.3",
+      "@types/http-errors": "^1.6.3",
+      "@types/jsonwebtoken": "^8.3.8",
+      "@types/morgan": "^1.9.0",
+      "@types/node": "^13.9.0",
+      "nodemon": "^2.0.1",
+      "ts-node": "^8.5.3",
+      "tslint": "^6.0.0",
+      "typescript": "^3.8.3"
+   }
 }
