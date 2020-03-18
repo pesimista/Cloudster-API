@@ -43,13 +43,14 @@ export const initializeServer = (): void => {
 
       /* If it is, the data gets updated */
       const update = connSync.run(`
-      UPDATE archivos SET
-      name = '${selected.name}'
-      , ext = '${selected.ext}'
-      , isFile = ${selected.isFile ? 1 : 0}
-      , fullSize = ${selected.fullSize}
-      , size = '${selected.size}'
-      WHERE ino = ${currentIno} COLLATE NOCASE
+         UPDATE archivos SET
+            name = '${selected.name}'
+            , ext = '${selected.ext}'
+            , isFile = ${selected.isFile ? 1 : 0}
+            , fullSize = ${selected.fullSize}
+            , size = '${selected.size}'
+            , dependency = ${selected.dependency}
+         WHERE ino = ${currentIno} COLLATE NOCASE
       `);
       if (update.error) {
          console.log('\x1b[31mUpdate \x1b[36m SYNC\x1b[0m ');
@@ -108,7 +109,7 @@ const loadFiles = (dir: PathLike, dep: number = 0, nivel: number = 1): IFile[] =
       const file = generateFile(dirent.name, dir.toString(), dep, nivel);
       files.push(file);
 
-      if (!file.isFile) {
+      if (dirent.isDirectory()) {
          const dependedFiles = loadFiles(dir + _ + dirent.name, file.ino, file.nivel);
          files = files.concat(dependedFiles);
       }
@@ -174,6 +175,7 @@ const generateFile = (fileName: string, dir: string, dep: number, nivel: number 
 // }
 const insertFileSync = (file: IFile, user: string = 'Cloudster'): boolean => {
    const query = insertQuery(file, user);
+   console.log(query);
    const res = connSync.run(query);
    if (res.error) {
       console.log("\x1b[32mUPDATE \x1b[36m SYNC \x1b[0m " + file.ino);
@@ -290,17 +292,30 @@ export const getFilesInDirectory = (req: Request, res: Response): void => {
    if (nivel === -1)
       return;
 
+   const last = req.url.split('/').pop();
+   let key = '';
+   console.log(last)
+   switch (last) {
+      case 'peers': {
+         key = 'dependency';
+         break;
+      }
+      case 'files':
+      default: {
+         key = 'ino';
+         break;
+      }
+   }
+
    const response = connSync.run(
       `UPDATE archivos SET
          lastAccessed='${new Date()}'
       WHERE
          dependency=?
-      AND
-         nivel<=?
-      AND
-         available=1
+         AND nivel<=?
+         AND available=1
       COLLATE NOCASE`
-      , [file.ino, nivel]
+      , [file[key], nivel]
    );
    // console.log(response)
 
@@ -314,12 +329,23 @@ export const getFilesInDirectory = (req: Request, res: Response): void => {
          AND
             available=1
          COLLATE NOCASE`
-      , [file.ino, nivel]
+      , [file[key], nivel]
    ) as unknown as IFile[];
 
    res.status(200).json(files.map(f => {
       return { ...f, isFile: f.isFile ? true : false };
    }));
+}
+
+export const getParent = (req: Request, res: Response): void => {
+   const [nivel, file] = verifyPermission(req, res);
+
+   if (nivel === -1)
+      return;
+
+   const parent = findFile(file.dependency);
+   res.status(200).json({ ...parent, isFile: parent.isFile ? true : false });
+
 }
 
 /**
@@ -365,6 +391,7 @@ export const downloadFile = (req: Request, res: Response): void => {
  */
 export const viewFile = (req: Request, res: Response): void => {
    console.log(req.headers)
+   res.removeHeader('X-Frame-Options')
    const [, file] = verifyPermission(req, res, false);
 
    console.log(file);
@@ -409,6 +436,7 @@ export const test = (req: Request, res: Response): void => {
 export const postFile = (req: Request, res: Response): void => {
    const ino = parseInt(req.params.ino, 10);
    const token = getTokenKey(req.headers.authorization);
+   console.log(token);
    if (isNaN(ino)) {
       res.status(400).send({ message: 'El ino no es compatible' });
       return;
@@ -600,7 +628,7 @@ export const setDirectory = (dir: string): boolean => {
  */
 const verifyPermission = (req: Request, res: Response, sendRes = true): any[] => {
    const { key } = getTokenKey(req.headers.authorization || 'bearer ' + req.query.token);
-   // const nivel = 5;
+   //  const nivel = 5;
 
    const [{ nivel }] = connSync.run(
       `SELECT nivel FROM usuarios WHERE key=? COLLATE NOCASE`

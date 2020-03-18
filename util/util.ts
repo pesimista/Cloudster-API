@@ -107,7 +107,9 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
 }
 
 export const getTokenKey = (token: string = ''): IUser => {
-   return jwt.decode(token.replace(/[Bb]earer /, '')) as unknown as IUser;
+   const res = jwt.decode(token.replace(/[Bb]earer /, '')) as unknown as IUser;
+   console.log(res);
+   return res;
 }
 
 /**
