@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Socket.io</title>
+</head>
+
+<body>
+   <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+      <ul id="ChatBox" style="list-style: none; width: 800px;">
+         <li style="text-align: left;">asd</li>
+         <li style="text-align: right;">asd</li>
+      </ul>
+      <div style="width: 800px; display: flex; justify-content: center;">
+         <textarea style="flex-grow: 1;" name="area" id="Text" cols="30" rows="5"></textarea>
+         <button onclick="send()" style="height: 100%; width: 100px;">
+            Send
+         </button>
+      </div>
+   </div>
+
+   <script>
+      const sox = new WebSocket(`ws://${window.location.host}`);
+      sox.onopen = (ws, event) => {
+         alert('Connected');
+         console.log(ws, event);
+      }
+
+      const Text = document.querySelector('#Text');
+
+      sox.onmessage = (event) => {
+        
+         const li = document.createElement('li');
+         li.textContent = JSON.parse(event.data).message;
+         li.style.textAlign = 'left';
+
+         ChatBox.appendChild(li)
+      }
+
+      const send = () => {
+         if (sox.OPEN) {
+
+            const li = document.createElement('li');
+            li.textContent = Text.value;
+            li.style.textAlign = 'right';
+
+            ChatBox.appendChild(li)
+
+            sox.send(Text.value);
+            Text.value = '';
+         }
+      }
+
+
+   </script>
+</body>
+
+</html>

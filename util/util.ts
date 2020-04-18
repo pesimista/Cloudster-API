@@ -11,6 +11,13 @@ const connection = sqliteSync.connect('cloudster.db');
 export const connSync = {
 
    run: (query: string, args?: any[]): IResult => {
+      if (args) {
+         args.forEach(item =>{
+            if(typeof item === 'string')
+               item = item.replace(/\'/g,"''");
+         })
+      }
+
       const res = connection.run(query, args);
       const columns = res[0]?.columns;
 
@@ -24,8 +31,8 @@ export const connSync = {
 
       const keys = rows.columns;
 
-      return rows['values'].map(arr => {
-         let row = {};
+      return rows.values.map(arr => {
+         const row = {};
          keys.forEach((key, index) => {
             row[key] = arr[index]
          });
@@ -59,6 +66,7 @@ export const connSync = {
 export const Authorization = (req: Request, res: Response, next: NextFunction) => {
    const token = req.header('Authorization') || 'bearer ' + req.query.token;
    if (!token || !token.toLocaleLowerCase().startsWith('bearer ')) {
+      console.log("invalid token or null");
       res.status(401).send('1');
       return;
    }
@@ -78,6 +86,7 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
 
    try {
       if (!decoded.key || !decoded.id) {
+         console.log("Invalid token; not key nor id");
          res.status(401).send('2');
          return;
       }
@@ -101,6 +110,7 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
 
       return next();
    } catch (error) {
+      console.log("Unanthorized");
       res.status(401).json({ message: 'Unanthorized - ' + error?.message });
       return;
    }

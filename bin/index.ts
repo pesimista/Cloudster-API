@@ -4,10 +4,11 @@
  * Module dependencies.
  */
 
-import app from "../app";
-import { cwd, setDirectory } from "../routes/files/rangerController";
-import http from "http";
-import debugModule from "debug";
+import debugModule from 'debug';
+import http from 'http';
+import app from '../app';
+import webSocket from 'ws';
+import { onconnection } from '../routes/files/socketController';
 const debug = debugModule('cloudster:server');
 // const http = require('http');
 
@@ -23,12 +24,18 @@ app.set('port', port);
 
 const server = http.createServer(app);
 
+// const wss = new webSocket.Server({ server });
+// wss.on('connection', onconnection);
+
 /**
  * Listen on provided port, on all network interfaces.
  */
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
+
+// console.log('server ' + JSON.stringify(wss.address()));
+
 
 /**
  * Normalize a port into a number, string, or false.
@@ -50,7 +57,7 @@ function normalizePort(val: string) {
 }
 
 /**
- * Event listener for HTTP server "error" event.
+ * Event listener for HTTP server 'error' event.
  */
 
 function onError(error: any) {
@@ -80,7 +87,7 @@ function onError(error: any) {
 // console.clear();
 
 /**
- * Event listener for HTTP server "listening" event.
+ * Event listener for HTTP server 'listening' event.
  */
 
 function onListening() {

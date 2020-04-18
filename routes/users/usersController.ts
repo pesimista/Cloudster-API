@@ -50,9 +50,9 @@ export const checkUser = (req: Request, res: Response): void => {
       \`pregunta1\`,
       \`pregunta2\`,
       \`nivel\`
-   FROM 
+   FROM
       usuarios
-   WHERE 
+   WHERE
       key='${user.key}';`;
 
    const result = connSync.run(query);
@@ -82,11 +82,11 @@ export const login = (req: Request, res: Response): void => {
       res.status(400).json({ message: `Faltan datos` });
       return;
    };
-   // let row: IUser;   
+   // let row: IUser;
    const result: IResult = connSync.run(`
       SELECT * FROM usuarios
          WHERE
-      usuario='${body.usuario}'
+      usuario='${body.usuario.replace(/\'/g, "''")}'
       COLLATE NOCASE;
    `);
 
@@ -106,7 +106,7 @@ export const login = (req: Request, res: Response): void => {
          SET
             intentos=intentos+1
          WHERE
-            usuario='${body.usuario}'
+            usuario='${body.usuario.replace(/\'/g, "''")}'
          COLLATE NOCASE;`);
       /* Unathorized */
       res.status(401)
@@ -126,13 +126,13 @@ export const login = (req: Request, res: Response): void => {
             intentos=0,
             key='${key}'
          WHERE
-            usuario='${body.usuario}'
+            usuario='${body.usuario.replace(/\'/g, "''")}'
          COLLATE NOCASE;`,
       );
       const token = hashToken(row, key);
       res.status(200).send({
          response: `Grant access`,
-         token: token,
+         token,
          user: {
             ...row,
             respuesta2: undefined,
@@ -176,7 +176,12 @@ export const register = (req: Request, res: Response): void => {
       return;
    }
    /* Llegados a este punto se asume que tiene todos los campos */
-   let [row] = connSync.run(`SELECT 1 FROM usuarios WHERE usuario='${body.usuario}'`) as unknown as IUser[];
+   let [row] = connSync.run(`
+      SELECT 1 FROM
+         usuarios
+      WHERE
+         usuario='${body.usuario.replace(/\'/g, "''")}'
+      `) as unknown as IUser[];
 
    if (!row) {
       res.status(400).send(`El nombre de usuario ya existe`);
@@ -199,15 +204,15 @@ export const register = (req: Request, res: Response): void => {
          ,\`key\`
       ) VALUES(
          '${id}',
-         '${body.nombre}',
-         '${body.apellido}',
-         '${body.password}',
+         '${body.nombre.replace(/\'/g, "''")}',
+         '${body.apellido.replace(/\'/g, "''")}',
+         '${body.password.replace(/\'/g, "''")}',
          date(),
-         '${body.usuario}',
+         '${body.usuario.replace(/\'/g, "''")}',
          ${body.pregunta1},
          ${body.pregunta2},
-         '${body.respuesta1}',
-         '${body.respuesta2}',
+         '${body.respuesta1.replace(/\'/g, "''")}',
+         '${body.respuesta2.replace(/\'/g, "''")}',
          1,
          '${key}'
       )`);
@@ -215,7 +220,12 @@ export const register = (req: Request, res: Response): void => {
       res.status(500).json({ ...result.error });
       return;
    }
-   [row] = connSync.run(`SELECT * FROM usuarios WHERE usuario='${body.usuario}'`) as unknown as IUser[];
+   [row] = connSync.run(`
+      SELECT * FROM
+         usuarios
+      WHERE
+         usuario='${body.usuario.replace(/\'/g, "''")}'
+      `) as unknown as IUser[];
 
    res.status(200).send({
       response: `Grant access`,
@@ -261,7 +271,7 @@ export const updateUserData = (req: Request, res: Response): void => {
       (key) => {
          const { name, has } = key
          if (body[name]) {
-            if (has) query += ` ${name}='${body[name]}',`;
+            if (has) query += ` ${name}='${body[name].replace(/\'/g, "''")}',`;
             else query += ` ${name}=${body[name]},`;
          }
       }
@@ -274,7 +284,12 @@ export const updateUserData = (req: Request, res: Response): void => {
       res.status(500).json({ ...result.error });
       return;
    }
-   [row] = connSync.run(`SELECT * FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`) as unknown as IUser[];
+   [row] = connSync.run(`
+      SELECT * FROM
+         usuarios
+      WHERE
+         id='${req.params.id}' COLLATE NOCASE;
+      `) as unknown as IUser[];
 
    /* Oll Korrect */
    res.status(200).json({
@@ -346,19 +361,19 @@ export const getUserQuestions = (req: Request, res: Response): void => {
    OR
       \`preguntas\`.\`id\`=\`usuarios\`.\`pregunta2\`
    WHERE
-      \`usuarios\`.\`usuario\`='${req.params.usuario}' COLLATE NOCASE;`;
+      \`usuarios\`.\`usuario\`='${req.params.usuario.replace(/\'/g, "''")}' COLLATE NOCASE;`;
 
-   const rows: IPreguntas[] = connSync.run(query) as unknown as IPreguntas[];
-   if (rows['error']) {
-      res.status(500).json(rows['error']);
+   const rows = connSync.run(query);
+   if (rows.error) {
+      res.status(500).json(rows.error);
       return;
    }
    if (!rows || !rows.length) {
       res.status(404).json({ message: 'El usuario ingresado no existe.' });
       return;
    }
-   const pregunta1 = rows.find(a => a.id_pregunta === a.pregunta1);
-   const pregunta2 = rows.find(a => a.id_pregunta === a.pregunta2);
+   const pregunta1: IPreguntas = rows.find((a: IPreguntas) => a.id_pregunta === a.pregunta1) as IPreguntas;
+   const pregunta2: IPreguntas = rows.find((a: IPreguntas) => a.id_pregunta === a.pregunta2) as IPreguntas;
    /* Sends username, userid, and both questions */
    res.status(200).json({
       usuario: rows[0].usuario,
@@ -380,8 +395,8 @@ export const checkUserQuestions = (req: Request, res: Response): void => {
    const query = `SELECT * FROM usuarios WHERE id='${id}' COLLATE NOCASE;`;
 
    const rows: IResult = connSync.run(query);
-   if (rows['error']) {
-      res.status(500).json(rows['error']);
+   if (rows.error) {
+      res.status(500).json(rows.error);
       return;
    }
 

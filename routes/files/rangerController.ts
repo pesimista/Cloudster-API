@@ -31,9 +31,9 @@ export const initializeServer = (): void => {
       .map((ino: { ino: number }) => ino.ino);
 
    rows.forEach(currentIno => {
-      const selected: IFile = <IFile>files.find(
+      const selected: IFile = files.find(
          f => f.ino === currentIno
-      );
+      ) as IFile;
 
       /* If the file doesn't exist in the current folder, marks it as unavailable */
       if (!selected) {
@@ -44,7 +44,7 @@ export const initializeServer = (): void => {
       /* If it is, the data gets updated */
       const update = connSync.run(`
          UPDATE archivos SET
-            name = '${selected.name}'
+            name = '${selected.name.replace(/\'/g, "''")}'
             , ext = '${selected.ext}'
             , isFile = ${selected.isFile ? 1 : 0}
             , fullSize = ${selected.fullSize}
@@ -57,7 +57,7 @@ export const initializeServer = (): void => {
          return;
       }
       console.log('\x1b[34mUpdate \x1b[36m SYNC\x1b[0m ' + currentIno);
-   });//foreach
+   });// foreach
    checkFiles(rows, files);
 }
 
@@ -75,9 +75,9 @@ const checkFiles = (rows: number[], files: IFile[], error?: Error): void => {
    }
    files.forEach(
       file => {
-         const selected: number = <number>rows.find(
+         const selected: number = rows.find(
             row => row === file.ino
-         );
+         ) as number;
          if (!selected) {
             insertFileSync(file);
          }
@@ -178,7 +178,7 @@ const insertFileSync = (file: IFile, user: string = 'Cloudster'): boolean => {
    console.log(query);
    const res = connSync.run(query);
    if (res.error) {
-      console.log("\x1b[32mUPDATE \x1b[36m SYNC \x1b[0m " + file.ino);
+      console.log("\x1b[32mINSERT \x1b[36m SYNC \x1b[0m " + file.ino);
       console.error(res.error)
       return false;
    }
@@ -208,7 +208,7 @@ const insertQuery = (file: IFile, user: string = 'Cloudster'): string => {
       )
       VALUES (
          ${file.ino}
-         , '${file.name}'
+         , '${file.name.replace(/\'/g, "''")}'
          , '${file.ext}'
          , ${file.isFile ? 1 : 0}
          , 1
@@ -253,10 +253,10 @@ const deleteFileSync = (ino: number): boolean => {
    //    , [+ino]
    // );
 
-   let res = connSync.run(`
-      DELETE FROM 
+   const res = connSync.run(`
+      DELETE FROM
          archivos
-      WHERE 
+      WHERE
          ino = ${ino}`
    );
    if (res.error) return false;
