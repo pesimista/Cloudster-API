@@ -10,7 +10,7 @@
       "prestart": "npm run build",
       "test": "echo \"Error: no test specified\" && exit 1",
       "start": "node ./bin/index.ts",
-      "dev": "SET DEBUG=helloworld:* & nodemon ./bin/index.ts"
+      "dev": "nodemon ./bin/index.ts"
    },
    "repository": {
       "type": "git",

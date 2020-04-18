@@ -67,7 +67,7 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
    const token = req.header('Authorization') || 'bearer ' + req.query.token;
    if (!token || !token.toLocaleLowerCase().startsWith('bearer ')) {
       console.log("invalid token or null");
-      res.status(401).send('1');
+      res.status(401).send('invalid token or null');
       return;
    }
    let decoded;
@@ -87,7 +87,7 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
    try {
       if (!decoded.key || !decoded.id) {
          console.log("Invalid token; not key nor id");
-         res.status(401).send('2');
+         res.status(401).send('Invalid token; not key nor id"');
          return;
       }
    } catch (error) {
