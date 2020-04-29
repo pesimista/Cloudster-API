@@ -4,12 +4,21 @@ import crypto, { pbkdf2Sync } from "crypto";
 import { IUser, IPreguntas } from "../../models/user";
 import { connSync, getTokenKey } from "../../util/util";
 import { IResult } from "../../models/result";
-import { IFile } from "../../models/files";
-import { parseSize } from "../files/rangerController";
 // import ranger from "./ranger";
 
 
-export const getUsers = (req: Request, res: Response, sendRes = true): IUser[] => {
+/**
+ * Retrieves the info for a spefic file
+ * @param req The incoming request
+ * @param res The outgoing response
+ */
+export const getFiles = (req: Request, res: Response): void => {
+   res.status(200).json(
+      connSync.run(`SELECT * FROM archivos`)
+   );
+}
+
+export const getUsers = (req: Request, res: Response): void => {
    const id = req.params.id;
    const query = `SELECT
       \`id\`,
@@ -29,17 +38,16 @@ export const getUsers = (req: Request, res: Response, sendRes = true): IUser[] =
    const result = connSync.run(query + where);
    if (result.error) {
       res.status(500).json({ ...result.error });
-      return [];
+      return;
    }
 
-   if (!sendRes) {
-      return result as unknown as IUser[];
-   } else if (id) {
+   if (id) {
       res.status(200).send(result[0] || {});
-   } else {
+      return;
+   }
+   else {
       res.status(200).send(result);
    }
-   return [];
 }
 
 export const checkUser = (req: Request, res: Response): void => {
@@ -415,57 +423,6 @@ export const checkUserQuestions = (req: Request, res: Response): void => {
       });
       return;
    } else res.status(401).json({ message: "Las respuestas no concuerdan" });
-}
-
-export const getFilesByUser = (req: Request, res: Response): void => {
-   const [user] = getUsers(req, res, false);
-
-   const files: IFile[] = connSync.run(
-      `SELECT * FROM
-            archivos
-         WHERE
-            usuario = ?
-         AND
-            nivel<=?
-         COLLATE NOCASE`
-      , [user.id, user.nivel]
-   ).map((f: IFile) => {
-      return { ...f, isFile: f.isFile ? true : false };
-   });
-
-   const [{ totalSize }] = connSync.run(
-      `SELECT SUM(fullSize) as totalSize FROM
-            archivos
-         WHERE
-            usuario = ?
-         AND
-            nivel<=?
-         COLLATE NOCASE`
-      , [user.id, user.nivel]
-   ) as unknown as {totalSize: number}[];
-
-   const chartData = connSync.run(
-      `SELECT ext as name, count(ino) as value FROM
-            archivos
-         WHERE
-            usuario = ?
-         AND
-            nivel<=?
-         GROUP BY 
-            ext
-         COLLATE NOCASE`
-      , [user.id, user.nivel]
-   ) as unknown as {name: string, value: number}[];
-
-   const parsedSize: string = parseSize(totalSize);
-
-   res.status(200).json({
-      files,
-      totalSize,
-      parsedSize,
-      chartData
-   });
-
 }
 
 /**

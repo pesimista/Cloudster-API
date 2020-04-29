@@ -4,6 +4,7 @@ import helmet from "helmet";
 import logger from "morgan";
 import { setDirectory } from "./routes/files/rangerController";
 import filesRouter from "./routes/files/rangerRoute";
+import adminRouter from "./routes/admin/adminRoute";
 import indexRouter from "./routes/index.route";
 import { getQuestions } from "./routes/users/usersController";
 import usersRouter from "./routes/users/usersRoute";
@@ -50,6 +51,7 @@ app.use('/api/users', usersRouter);
 app.get('/api/questions', getQuestions);
 /* Archivos */
 app.use('/api/files', filesRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api', indexRouter);
 app.use('/', (req: Request, res: Response, next: NextFunction) => {
    res.send("AYUDAMEDIOS")

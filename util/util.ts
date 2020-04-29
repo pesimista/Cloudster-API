@@ -12,9 +12,9 @@ export const connSync = {
 
    run: (query: string, args?: any[]): IResult => {
       if (args) {
-         args.forEach(item =>{
-            if(typeof item === 'string')
-               item = item.replace(/\'/g,"''");
+         args.forEach(item => {
+            if (typeof item === 'string')
+               item = item.replace(/\'/g, "''");
          })
       }
 
@@ -67,7 +67,7 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
    const token = req.header('Authorization') || 'bearer ' + req.query.token;
    if (!token || !token.toLocaleLowerCase().startsWith('bearer ')) {
       console.log("invalid token or null");
-      res.status(401).send('1');
+      res.status(401).json({ message: 'Unanthorized 1' });
       return;
    }
    let decoded;
@@ -87,7 +87,7 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
    try {
       if (!decoded.key || !decoded.id) {
          console.log("Invalid token; not key nor id");
-         res.status(401).send('2');
+         res.status(401).json({ message: 'Unanthorized 2' });
          return;
       }
    } catch (error) {
@@ -95,25 +95,47 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
       return;
    }
 
-   try {
-      const rows = connSync.run(`SELECT '' FROM usuarios WHERE id='${decoded.id.trim()}' AND key='${decoded.key.trim()}' COLLATE NOCASE`);
-      if (rows.error) {
-         res.status(500).json(rows.error);
-         return;
-      }
-      const [row] = rows as unknown as any[];
-
-      if (!row) {
-         res.status(401).json({ message: 'Unanthorized ' });
-         return;
-      }
-
-      return next();
-   } catch (error) {
-      console.log("Unanthorized");
-      res.status(401).json({ message: 'Unanthorized - ' + error?.message });
+   const rows = connSync.run(`SELECT 1 FROM usuarios WHERE id='${decoded.id.trim()}' AND key='${decoded.key.trim()}' COLLATE NOCASE`);
+   if (rows.error) {
+      res.status(500).json(rows.error);
       return;
    }
+   const [row] = rows as unknown as any[];
+
+   if (!row) {
+      res.status(401).json({ message: 'Unanthorized 3' });
+      return;
+   }
+
+   return next();
+}
+
+export const AdminAuth = (req: Request, res: Response, next: NextFunction) => {
+   const token = req.header('Authorization') || 'bearer ' + req.query.token;
+   const decoded = getTokenKey(token);
+
+   const rows = connSync.run(`
+      SELECT 
+         nivel 
+      FROM 
+         usuarios 
+      WHERE 
+         id='${decoded.id.trim()}' 
+      AND 
+         key='${decoded.key.trim()}' 
+      COLLATE NOCASE
+   `);
+
+   if (rows.error) {
+      res.status(500).json(rows.error);
+      return;
+   }
+   const [row] = rows as unknown as any[];
+
+   if (row.nivel < 5)
+      res.status(401).json({ message: 'Unanthorized 4' });
+
+   return next();
 }
 
 export const getTokenKey = (token: string = ''): IUser => {

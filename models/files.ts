@@ -14,4 +14,5 @@ export interface IFile {
    size: string;
    dependency?: number;
    nivel: number;
+   usuario?: string;
 }

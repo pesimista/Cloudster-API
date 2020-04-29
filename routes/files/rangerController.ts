@@ -417,16 +417,6 @@ export const viewFile = (req: Request, res: Response): void => {
    res.status(200).sendFile(route);
 }
 
-/**
- * Retrieves the info for a spefic file
- * @param req The incoming request
- * @param res The outgoing response
- */
-export const test = (req: Request, res: Response): void => {
-   res.status(200).json(
-      connSync.run(`SELECT * FROM archivos`)
-   );
-}
 
 /**
  * Handles the entire process of uploading a new file to the server
@@ -729,7 +719,7 @@ const setNewName = (fileName: string, ino: number = 0): string => {
  * Converts the bytes into its correspoding unit in terms of space
  * @param size full size
  */
-const parseSize = (size: number): string => {
+export const parseSize = (size: number): string => {
    if (size < 1024)
       return `${size.toFixed(2)} Bytes`;
 
