@@ -10,7 +10,7 @@
       "prestart": "npm run build",
       "test": "echo \"Error: no test specified\" && exit 1",
       "start": "node ./bin/index.ts",
-      "dev": "SET DEBUG=helloworld:* & nodemon ./bin/index.ts"
+      "dev": "nodemon ./bin/index.ts"
    },
    "repository": {
       "type": "git",
@@ -59,6 +59,6 @@
       "ts-node": "^8.5.3",
       "tslint": "^6.0.0",
       "typescript": "^3.8.3",
-      "minimist": "^0.2.1"
+      "minimist": "^1.2.3"
    }
 }

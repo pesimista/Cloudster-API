@@ -67,7 +67,7 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
    const token = req.header('Authorization') || 'bearer ' + req.query.token;
    if (!token || !token.toLocaleLowerCase().startsWith('bearer ')) {
       console.log("invalid token or null");
-      res.status(401).json({ message: 'Unanthorized 1' });
+      res.status(401).json({ message: 'Unanthorized 1 invalid token or null' });
       return;
    }
    let decoded;
@@ -87,7 +87,7 @@ export const Authorization = (req: Request, res: Response, next: NextFunction) =
    try {
       if (!decoded.key || !decoded.id) {
          console.log("Invalid token; not key nor id");
-         res.status(401).json({ message: 'Unanthorized 2' });
+         res.status(401).json({ message: 'Unanthorized 2 Invalid token; not key nor id' });
          return;
       }
    } catch (error) {
