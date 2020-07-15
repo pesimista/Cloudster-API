@@ -1,65 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A</title>
+  </head>
 
-<head>
-   <meta charset="UTF-8" />
-   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-   <title>A</title>
-</head>
+  <body>
+    <ul id="list"></ul>
 
-<body>
-   <ul id="list">
-
-   </ul>
-
-   <script>
-
+    <script>
       const handleFetch = (response) => {
-         return response.json()
-            .then(json => {
-               if (response.ok)
-                  return json;
-               else
-                  return Promise.reject(json);
-            });
+        return response.json().then((json) => {
+          if (response.ok) return json;
+          else return Promise.reject(json);
+        });
       };
 
       const fe = () => {
-         fetch('/api/files/test', {
-            headers: {
-               'Authorization': localStorage.getItem('token')
-            }
-         })
-            .then(handleFetch)
-            .then(data => {
-               const li = data.map(file => {
-                  return `
+        fetch('/api/files/test', {
+          headers: {
+            Authorization: localStorage.getItem('token'),
+          },
+        })
+          .then(handleFetch)
+          .then((data) => {
+            const li = data.map((file) => {
+              return `
                      <li>
-                        <a href="/api/files/${file.ino}/watch?token=${localStorage.getItem('token')}" target="_new">
+                        <a href="/api/files/${
+                          file.ino
+                        }/watch?token=${localStorage.getItem(
+                'token'
+              )}" target="_new">
                            ${file.name}
                         </a>
                      </li>
                   `;
-               });
-               console.log(li.join(''));
-               list.innerHTML = li.join('');
             });
-      }
+            console.log(li.join(''));
+            list.innerHTML = li.join('');
+          });
+      };
 
       fetch('/api/users/login', {
-         method: 'POST',
-         headers: { "Content-Type": "application/json" },
-         body: JSON.stringify({
-            usuario: 'mezzmar',
-            password: 'qwerty'
-         })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          usuario: 'mezzmar',
+          password: 'qwerty',
+        }),
       })
-         .then(handleFetch)
-         .then(data => {
-            localStorage.setItem('token', data.token);
-            fe();
-         })
-   </script>
-</body>
-
+        .then(handleFetch)
+        .then((data) => {
+          localStorage.setItem('token', data.token);
+          fe();
+        });
+    </script>
+  </body>
 </html>

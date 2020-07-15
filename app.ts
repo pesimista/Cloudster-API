@@ -1,15 +1,14 @@
-import compression from "compression";
-import express, { Application, NextFunction, Request, Response } from "express";
-import helmet from "helmet";
-import logger from "morgan";
-import { setDirectory } from "./routes/files/rangerController";
-import filesRouter from "./routes/files/rangerRoute";
-import adminRouter from "./routes/admin/adminRoute";
-import indexRouter from "./routes/index.route";
-import { getQuestions } from "./routes/users/usersController";
-import usersRouter from "./routes/users/usersRoute";
-import { _ } from "./util/util";
-
+import compression from 'compression';
+import express, { Application, NextFunction, Request, Response } from 'express';
+import helmet from 'helmet';
+import logger from 'morgan';
+import { setDirectory } from './routes/files/rangerController';
+import filesRouter from './routes/files/rangerRoute';
+import adminRouter from './routes/admin/adminRoute';
+import indexRouter from './routes/index.route';
+import { getQuestions } from './routes/users/usersController';
+import usersRouter from './routes/users/usersRoute';
+import { _ } from './util/util';
 
 /* Instantiate app */
 const app: Application = express();
@@ -30,17 +29,17 @@ app.use(express.urlencoded({ extended: false }));
  * Cross Origin Requests Service
  */
 app.use((req: Request, res: Response, next: NextFunction) => {
-   res.header('Access-Control-Allow-Origin', '*');
-   res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', '*');
 
-   // console.log(`\n${getColor(req.method)}\t\x1b[36m'${req.originalUrl}'\x1b[0m\t `)
+  // console.log(`\n${getColor(req.method)}\t\x1b[36m'${req.originalUrl}'\x1b[0m\t `)
 
-   /* Pa que no aparezca en gris el req >///< */
-   if (req.method === 'OPTIONS') {
-      res.header('Access-Control-Allow-Methods', '*');
-      return res.json({});
-   }
-   return next();
+  /* Pa que no aparezca en gris el req >///< */
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Methods', '*');
+    return res.json({});
+  }
+  return next();
 });
 
 /**
@@ -54,11 +53,11 @@ app.use('/api/files', filesRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api', indexRouter);
 app.use('/', (req: Request, res: Response, next: NextFunction) => {
-   res.send("AYUDAMEDIOS")
-})
+  res.send('AYUDAMEDIOS');
+});
 app.use('/*', (req, res) => {
-   res.status(404).send();
-})
+  res.status(404).send();
+});
 
 // // catch 404 and forward to error handler
 // app.use((req: Request, res: Response, next: NextFunction) => {
@@ -80,19 +79,24 @@ app.use('/*', (req, res) => {
 
 // module.exports = app;
 
-
 /**
  * @Description Get the corresponding color for every route depending on the method
  * @param method Method
  */
 const getColor = (method: string) => {
-   method = method.toLowerCase();
-   const color = (method === 'get') ? "\x1b[32m" :
-      (method === 'post') ? "\x1b[33m" :
-         (method === 'put') ? "\x1b[34m" :
-            (method === 'delete') ? "\x1b[31m" : "\x1b[35m";
-   return color + method.toUpperCase();
-}
+  method = method.toLowerCase();
+  const color =
+    method === 'get'
+      ? '\x1b[32m'
+      : method === 'post'
+      ? '\x1b[33m'
+      : method === 'put'
+      ? '\x1b[34m'
+      : method === 'delete'
+      ? '\x1b[31m'
+      : '\x1b[35m';
+  return color + method.toUpperCase();
+};
 
 setDirectory(__dirname + _ + 'temp');
 export default app;

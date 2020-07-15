@@ -1,22 +1,18 @@
 {
-   "compilerOptions": {
-      "target": "es6",
-      "module": "commonjs",
-      "sourceMap": true,
-      "outDir": "dist",
-      "strict": true,
-      "moduleResolution": "node",
-      "baseUrl": ".",
-      "esModuleInterop": true,
-      "noImplicitAny": false,
-      "typeRoots": ["./typings", "node_modules/@types"],
-      "paths": {
-         "*": [
-            "node_modules/*"
-         ]
-      }
-   },
-   "include": [
-      "./**/*"
-   ]
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "sourceMap": true,
+    "outDir": "dist",
+    "strict": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "esModuleInterop": true,
+    "noImplicitAny": false,
+    "typeRoots": ["./typings", "node_modules/@types"],
+    "paths": {
+      "*": ["node_modules/*"]
+    }
+  },
+  "include": ["./**/*"]
 }

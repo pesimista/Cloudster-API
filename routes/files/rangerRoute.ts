@@ -1,20 +1,20 @@
-import express from "express";
-import multer from "multer";
-import { Authorization } from "../../util/util";
+import express from 'express';
+import multer from 'multer';
+import { Authorization } from '../../util/util';
 import {
-   downloadFile,
-   getFileInfo,
-   getFilesInDirectory,
-   getParent,
-   postFile,
-   postFolder,
-   putFile,
-   viewFile
-} from "./rangerController";
+  downloadFile,
+  getFileInfo,
+  getFilesInDirectory,
+  getParent,
+  postFile,
+  postFolder,
+  putFile,
+  viewFile,
+} from './rangerController';
 
 // var express = require('express');
 const ranger = express.Router();
-const upload = multer({ dest: "temp/" });
+const upload = multer({ dest: 'temp/' });
 
 /* GET files listing. */
 ranger.get('/', Authorization, getFilesInDirectory);
@@ -36,6 +36,5 @@ ranger.put('/:ino', Authorization, putFile);
 // ranger.get('/:id', Authorization, getUsers);
 // ranger.get('/:usuario/questions', getUserQuestions);
 // ranger.get('/', Authorization, getUsers);
-
 
 export default ranger;
