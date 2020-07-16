@@ -27,6 +27,7 @@ export const getUsers = (req: Request, res: Response): void => {
       \`pregunta2\`,
       \`respuesta1\`,
       \`respuesta2\`,
+      \`active\`,
       \`nivel\`
    FROM usuarios`;
 

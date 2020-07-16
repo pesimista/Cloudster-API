@@ -10,6 +10,7 @@ import {
   postFolder,
   putFile,
   viewFile,
+  removeFile,
 } from './rangerController';
 
 // var express = require('express');
@@ -18,7 +19,6 @@ const upload = multer({ dest: 'temp/' });
 
 /* GET files listing. */
 ranger.get('/', Authorization, getFilesInDirectory);
-// ranger.get('/test', test);
 ranger.get('/:ino', Authorization, getFileInfo);
 ranger.get('/:ino/watch', Authorization, viewFile);
 ranger.get('/:ino/download', Authorization, downloadFile);
@@ -33,8 +33,7 @@ ranger.post('/:ino/folder', Authorization, postFolder);
 /* PUT a file */
 ranger.put('/:ino', Authorization, putFile);
 
-// ranger.get('/:id', Authorization, getUsers);
-// ranger.get('/:usuario/questions', getUserQuestions);
-// ranger.get('/', Authorization, getUsers);
+/** DELETE a file */
+ranger.delete('/:ino', Authorization, removeFile);
 
 export default ranger;

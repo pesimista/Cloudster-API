@@ -3,6 +3,7 @@ import fs, { Dirent, PathLike } from 'fs';
 import path from 'path';
 import { IFile } from '../../models/files';
 import { connSync, getTokenKey, _ } from '../../util/util';
+import { IUser } from '../../models/user';
 
 /* Defines whether or not the data base is being updated */
 export let updating: boolean = false;
@@ -509,12 +510,23 @@ export const postFolder = (req: Request, res: Response): void => {
 export const putFile = (req: Request, res: Response): void => {
   const ino = +req.params.ino;
   if (isNaN(ino) || ino === 0) {
-    res.status(400).json();
+    res.status(400).json({ response: 'Algo salió mal' });
     return;
   }
 
-  const [userLevel, file] = verifyPermission(req, res);
-  const { nivel, name = '' } = req.body as IFile;
+  const [userLevel, file, user] = verifyPermission(req, res);
+
+  if (user.id !== file.usuario && user.nivel < 5) {
+    res.status(401).json({ response: `No tienes los permisos` });
+    return;
+  }
+
+  let { nivel = 0, name = '' } = req.body as IFile;
+  if (!nivel) {
+    nivel = file.nivel;
+  } else if (nivel > userLevel) {
+    nivel = userLevel;
+  }
 
   let response;
   if (name) {
@@ -524,7 +536,7 @@ export const putFile = (req: Request, res: Response): void => {
     const final = setNewName(name, ino);
     const newName: string = path.dirname(originalname) + _ + final;
     try {
-      console.log(fs.existsSync(originalname).toString());
+      // console.log(fs.existsSync(originalname).toString());
       fs.renameSync(originalname, newName);
     } catch (error) {
       res.status(500).json({ ...error });
@@ -546,17 +558,56 @@ export const putFile = (req: Request, res: Response): void => {
          nivel=${nivel}
       WHERE ino=${ino};
    `);
-  if (response.error) res.status(500).json(response);
-  else res.status(200).json({ message: 'Oll korrect' });
+  if (response.error) {
+    res.status(500).json(response);
+    return;
+  }
+  res.status(200).json({ message: 'Oll korrect' });
 };
+
 /**
  * Doesn't actually deletes the file but marks it as unavailable
  * @param req The incoming request
  * @param res The outgoing response
  */
 export const removeFile = (req: Request, res: Response): void => {
-  if (isNaN(+req.params.ino)) return;
-  deleteFileSync(+req.params.ino);
+  const ino = +req.params.ino;
+  if (isNaN(ino) || ino === 0) {
+    res.status(400).json({ response: 'Algo salió mal' });
+    return;
+  }
+
+  const [userLevel, file, user] = verifyPermission(req, res);
+
+  if (user.id !== file.usuario && userLevel < 5) {
+    res.status(401).json({ response: `No tienes los permisos.` });
+    return;
+  }
+
+  if (!file.isFile) {
+    res.status(400).json({ response: `Las carpetas no pueden desactivarse.` });
+    return;
+  }
+
+  const result = markUnavailableSync(+req.params.ino, +!file.available);
+  if (result) {
+    const message = !file.available
+      ? 'Archivo restaurado'
+      : 'Archivo suspendido';
+    res.status(200).json({ message });
+    return;
+  }
+  res.status(500).json({ response: 'Algo salió mal' });
+};
+
+const markUnavailableSync = (ino: number, value: number): boolean => {
+  const res = connSync.run(`
+    UPDATE archivos SET
+      available = ${value},
+      lastModified='${new Date()}'
+    WHERE ino = ${ino} COLLATE NOCASE`);
+  console.log(res);
+  return !Boolean(res.error);
 };
 
 /**
@@ -623,25 +674,25 @@ const verifyPermission = (
   //  const nivel = 5;
 
   const [
-    { nivel },
+    user,
   ] = (connSync.run(`SELECT nivel FROM usuarios WHERE key=? COLLATE NOCASE`, [
     key,
   ]) as unknown) as IFile[];
 
-  if (!req.params.ino) return [nivel, { ino: 0 }];
+  if (!req.params.ino) return [user.nivel, { ino: 0 }];
 
   const file = findFile(req.params.ino);
 
   if (!file) {
-    if (sendRes) res.status(404).send();
+    if (sendRes) res.status(404).send({ response: 'file not found' });
     return [-1, { status: 404 }];
   }
-  if (file.nivel > nivel) {
+  if (file.nivel > user.nivel) {
     if (sendRes)
       res.status(401).json({ message: `No tiene acceso a este archivo` });
     return [-1, { status: 401 }];
   }
-  return [nivel, file];
+  return [user.nivel, file, user];
 };
 
 /**
@@ -688,7 +739,7 @@ export const findFile = (ino: string | number = 0): IFile => {
   }
 
   const [file]: IFile[] = (connSync.run(
-    `SELECT * FROM archivos WHERE ino=${ino} AND available=1`
+    `SELECT * FROM archivos WHERE ino=${ino}`
   ) as unknown) as IFile[];
 
   if (!file) return file;

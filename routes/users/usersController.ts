@@ -24,6 +24,7 @@ export const getUsers = (
       \`pregunta2\`,
       \`respuesta1\`,
       \`respuesta2\`,
+      \`active\`,
       \`nivel\`
    FROM usuarios`;
 
@@ -103,6 +104,13 @@ export const login = (req: Request, res: Response): void => {
   if (!row) {
     /* Unathorized */
     res.status(401).json({ message: `Credenciales incorrectas` });
+    return;
+  } else if (!row.active) {
+    res
+      .status(401)
+      .json({
+        message: `El usuario se encuentra suspendido. Comuniquese con el adminitrador.`,
+      });
     return;
   } else if (
     row.password.trim() !== body.password.trim() ||
@@ -211,6 +219,7 @@ export const register = (req: Request, res: Response): void => {
          ,\`respuesta1\`
          ,\`respuesta2\`
          ,\`nivel\`
+         ,\`active\`
          ,\`key\`
       ) VALUES(
          '${id}',
@@ -223,6 +232,7 @@ export const register = (req: Request, res: Response): void => {
          ${body.pregunta2},
          '${body.respuesta1.replace(/\'/g, "''")}',
          '${body.respuesta2.replace(/\'/g, "''")}',
+         1,
          1,
          '${key}'
       )`);
@@ -258,6 +268,17 @@ export const register = (req: Request, res: Response): void => {
  */
 export const updateUserData = (req: Request, res: Response): void => {
   const body = (req.body as unknown) as IUser;
+
+  const { id, nivel } = getTokenKey(req.headers.authorization);
+
+  if (
+    (req.params.id !== id && nivel < 5) ||
+    (nivel < 5 && body.hasOwnProperty('active'))
+  ) {
+    res.status(401).json({ message: `No tienes los permisos` });
+    return;
+  }
+
   let [row] = (connSync.run(
     `SELECT id FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`
   ) as unknown) as IUser[];
@@ -278,10 +299,11 @@ export const updateUserData = (req: Request, res: Response): void => {
     { name: 'pregunta2', has: false },
     { name: 'respuesta2', has: true },
     { name: 'nivel', has: false },
+    { name: 'active', has: false },
   ];
   keys.forEach((key) => {
     const { name, has } = key;
-    if (body[name]) {
+    if (body.hasOwnProperty(name)) {
       if (has) query += ` ${name}='${body[name].replace(/\'/g, "''")}',`;
       else query += ` ${name}=${body[name]},`;
     }
@@ -302,16 +324,19 @@ export const updateUserData = (req: Request, res: Response): void => {
       `) as unknown) as IUser[];
 
   /* Oll Korrect */
+  const hideToken = req.params.id !== id;
   res.status(200).json({
     response: `Usuario actualizado`,
-    token: hashToken(row),
-    user: {
-      ...row,
-      respuesta2: undefined,
-      respuesta1: undefined,
-      password: undefined,
-      intentos: undefined,
-    },
+    token: hideToken ? '' : hashToken(row),
+    user: hideToken
+      ? ''
+      : {
+          ...row,
+          respuesta2: undefined,
+          respuesta1: undefined,
+          password: undefined,
+          intentos: undefined,
+        },
   });
 }; // updateUserData
 
@@ -362,6 +387,7 @@ export const getUserQuestions = (req: Request, res: Response): void => {
       \`pregunta2\`,
       \`usuario\`,
       \`usuarios\`.\`id\` as id_usuario,
+      \`usuarios\`.\`active\`,
       \`pregunta\`
    FROM
       \`usuarios\`
@@ -384,6 +410,14 @@ export const getUserQuestions = (req: Request, res: Response): void => {
   }
   if (!rows || !rows.length) {
     res.status(404).json({ message: 'El usuario ingresado no existe.' });
+    return;
+  }
+  if (!rows[0].active) {
+    res
+      .status(401)
+      .json({
+        message: `El usuario se encuentra suspendido. Comuniquese con el adminitrador.`,
+      });
     return;
   }
   const pregunta1: IPreguntas = rows.find(

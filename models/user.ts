@@ -11,6 +11,7 @@ export interface IUser {
   desde: string;
   nivel: number;
   intentos: number;
+  active: boolean;
   confirmpassword?: string;
   [key: string]: any;
 }
