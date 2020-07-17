@@ -405,7 +405,7 @@ export const getUserQuestions = (req: Request, res: Response): void => {
 
   const rows = connSync.run(query);
   if (rows.error) {
-    res.status(500).json(rows.error);
+    res.status(500).json({message: rows.error});
     return;
   }
   if (!rows || !rows.length) {
