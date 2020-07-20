@@ -106,11 +106,9 @@ export const login = (req: Request, res: Response): void => {
     res.status(401).json({ message: `Credenciales incorrectas` });
     return;
   } else if (!row.active) {
-    res
-      .status(401)
-      .json({
-        message: `El usuario se encuentra suspendido. Comuniquese con el adminitrador.`,
-      });
+    res.status(401).json({
+      message: `El usuario se encuentra suspendido. Comuniquese con el adminitrador.`,
+    });
     return;
   } else if (
     row.password.trim() !== body.password.trim() ||
@@ -405,7 +403,7 @@ export const getUserQuestions = (req: Request, res: Response): void => {
 
   const rows = connSync.run(query);
   if (rows.error) {
-    res.status(500).json({message: rows.error});
+    res.status(500).json({ message: rows.error });
     return;
   }
   if (!rows || !rows.length) {
@@ -413,11 +411,9 @@ export const getUserQuestions = (req: Request, res: Response): void => {
     return;
   }
   if (!rows[0].active) {
-    res
-      .status(401)
-      .json({
-        message: `El usuario se encuentra suspendido. Comuniquese con el adminitrador.`,
-      });
+    res.status(401).json({
+      message: `El usuario se encuentra suspendido. Comuniquese con el adminitrador.`,
+    });
     return;
   }
   const pregunta1: IPreguntas = rows.find(

@@ -5,14 +5,15 @@ export interface IFile {
   url?: string;
   ext: string;
   isFile: boolean;
-  available: boolean;
-  lastModified?: Date;
-  lastChanged?: Date;
-  lastAccessed?: Date;
-  birthtime: Date;
+  available?: boolean;
+  lastModified?: number | Date;
+  lastDownload?: number | Date;
+  lastAccessed?: number | Date;
+  birthtime: number | Date;
   fullSize: number;
   size: string;
   dependency?: number;
   nivel: number;
   usuario?: string;
+  upBy?: string;
 }

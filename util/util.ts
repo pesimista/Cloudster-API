@@ -39,19 +39,6 @@ export const connSync = {
   },
 };
 
-// const sqlite3 = sqlite.verbose();
-// export const conn = new sqlite3.Database('./cloudster.db')
-
-/*
-, (err: Error | null) => {
-   if (err) {
-      console.log("Error");
-   }
-   else {
-      console.log(randomUpper('cONNeCTed suCcESsfUlLy To tHe DatABasE'));
-   }
-});
-*/
 /**
  * Express Middleware to validate that the key sent by the client has a
  * key that corresponds to the user
@@ -64,7 +51,7 @@ export const Authorization = (
   res: Response,
   next: NextFunction
 ) => {
-  const token = req.header('Authorization') || 'bearer ' + req.query.token;
+  const token = req.headers.authorization || 'bearer ' + req.query.token;
   if (!token || !token.toLocaleLowerCase().startsWith('bearer ')) {
     console.log('invalid token or null');
     res.status(401).json({ message: 'Unanthorized 1 invalid token or null' });
@@ -77,9 +64,8 @@ export const Authorization = (
     return res.status(500).json({ message: error.message });
   }
 
-  if (!decoded && !req.headers.origin) {
-    const dir = path.dirname(__dirname);
-    res.status(200).sendFile(`${dir}${_}pages${_}notFound.html`);
+  if (!decoded && !req.headers.authorization) {
+    res.status(200).sendFile(getLocalPage());
     return;
   }
 
@@ -142,7 +128,6 @@ export const AdminAuth = (req: Request, res: Response, next: NextFunction) => {
 
 export const getTokenKey = (token: string = ''): IUser => {
   const res = (jwt.decode(token.replace(/[Bb]earer /, '')) as unknown) as IUser;
-  console.log(res);
   return res;
 };
 
@@ -160,5 +145,34 @@ export const randomUpper = (value: string): string => {
 
   return toReturn;
 };
-/** The saparator */
-export const _ = process.platform === 'win32' ? '\\' : '/';
+
+export const getLocalPage = (pageName: string = 'notFound.html'): string => {
+  const dir = path.dirname(__dirname);
+  return path.join(dir, 'pages', 'notFound.html');
+};
+
+export const makeReg = (
+  userID: string,
+  ino: number,
+  accion: 'read' | 'downloaded' | 'modified' | 'uploaded' | 'deleted', 
+  oldVal: string = '',
+  newVal: string = ''
+) => {
+  const res = connSync.run(`
+    INSERT INTO registros (
+      usuario,
+      ino,
+      accion,
+      old_value,
+      new_value,
+      fecha
+    ) values (
+      '${userID}',
+      ${ino},
+      '${accion}',
+      '${oldVal}',
+      '${newVal}',
+      ${new Date().getTime()}
+    )
+  `);
+}

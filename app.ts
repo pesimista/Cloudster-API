@@ -8,7 +8,7 @@ import adminRouter from './routes/admin/adminRoute';
 import indexRouter from './routes/index.route';
 import { getQuestions } from './routes/users/usersController';
 import usersRouter from './routes/users/usersRoute';
-import { _ } from './util/util';
+import path from 'path';
 
 /* Instantiate app */
 const app: Application = express();
@@ -99,5 +99,5 @@ const getColor = (method: string) => {
   return color + method.toUpperCase();
 };
 
-setDirectory(__dirname + _ + 'temp');
+setDirectory(path.join(__dirname, 'temp'));
 export default app;

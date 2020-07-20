@@ -4,7 +4,8 @@ import {
   getFiles,
   getUsers,
   getFilesDetails,
-  getUsersDetails
+  generateFileReport,
+  getUsersDetails,
 } from './adminController';
 
 // var express = require('express');
@@ -17,5 +18,6 @@ router.get('/users', Authorization, AdminAuth, (req, res) =>
 router.get('/files', Authorization, AdminAuth, getFiles);
 router.get('/files/details', Authorization, AdminAuth, getFilesDetails);
 router.get('/users/details', Authorization, AdminAuth, getUsersDetails);
+router.get('/', generateFileReport);
 // module.exports = router;
 export default router;
