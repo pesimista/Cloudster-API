@@ -11,10 +11,12 @@
     width: 100%;
     display: flex;
     flex-wrap: wrap;
+    margin-bottom: 20px;
     justify-content: center;
   }
   .header * {
     text-align: center;
+    margin-bottom: 0;
   }
   .header h1 {
     width: 100%;
@@ -45,6 +47,9 @@
   <body>
     <div class="header">
       <h1>Reporte - Archivos en el servidor</h1>
+      <p style="width: 100%">
+        Generado automaticamente por Cloudster
+      </p>
       <p style="text-align: left;">
         Solicitado por : {{ username }}
       </p>
@@ -65,13 +70,13 @@
           </tr>
         </thead>
         <tbody>
-          {{#each files as |file|}}
+          {{#each data as |file|}}
           <tr>
             <td>{{file.ino}}</td>
             <td>{{file.name}}</td>
             <td>{{file.username}}</td>
             <th>{{file.birthtime}}</th>
-            <td>{{file.username_mo}}</td>
+            <td style="text-align: center;">{{file.username_mo}}</td>
             <th>{{file.lastModified}}</th>
           </tr>
           {{/each}}

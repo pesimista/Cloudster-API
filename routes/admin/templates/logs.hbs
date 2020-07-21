@@ -46,7 +46,7 @@
 <html>
   <body>
     <div class="header">
-      <h1>Reporte - Descargas de archivos</h1>
+      <h1>Reporte - Ingresos al sitio</h1>
       <p style="width: 100%">
         Generado automaticamente por Cloudster
       </p>
@@ -61,19 +61,21 @@
       <table>
         <thead>
           <tr>
-            <th>INO</th>
-            <th>Nombre</th>
-            <th>Descargado por</th>
+            <th>User ID</th>
+            <th>Usuario</th>
+            <th>Actividad</th>
+            <th>Rultado</th>
             <th>Fecha</th>
           </tr>
         </thead>
         <tbody>
-          {{#each data as |file|}}
+          {{#each data as |reg|}}
           <tr>
-            <td>{{file.ino}}</td>
-            <td>{{file.name}}</td>
-            <td>{{file.username}}</td>
-            <th>{{file.fecha}}</th>
+            <td>{{reg.performedBy}}</td>
+            <td>{{reg.username}}</td>
+            <td>{{reg.accion}}</td>
+            <th>{{reg.result}}</th>
+            <th>{{reg.fecha}}</th>
           </tr>
           {{/each}}
         </tbody>

@@ -19,17 +19,17 @@ export const getFiles = (req: Request, res: Response): void => {
 
 export const getUsers = (req: Request, res: Response): void => {
   const query = `SELECT
-      \`id\`,
-      \`usuario\`,
-      \`nombre\`,
-      \`apellido\`,
-      \`desde\`,
-      \`pregunta1\`,
-      \`pregunta2\`,
-      \`respuesta1\`,
-      \`respuesta2\`,
-      \`active\`,
-      \`nivel\`
+    \`id\`,
+    \`usuario\`,
+    \`nombre\`,
+    \`apellido\`,
+    \`desde\`,
+    \`pregunta1\`,
+    \`pregunta2\`,
+    \`respuesta1\`,
+    \`respuesta2\`,
+    \`active\`,
+    \`nivel\`
    FROM usuarios`;
 
   const result = connSync.run(query);
@@ -48,25 +48,28 @@ const getDetails = (
   table: string,
   available: string
 ): Details => {
-  const query = `SELECT
-    ${suma} as totalSize,
-    count(${id}) as total,
-    SUM(${available}) as available,
-    SUM(1 - ${available}) as disabled
-  FROM
-    ${table}`;
+  const query = `
+    SELECT
+      ${suma} as totalSize,
+      count(${id}) as total,
+      SUM(${available}) as available,
+      SUM(1 - ${available}) as disabled
+    FROM
+      ${table}`;
 
   const [res] = (connSync.run(query) as unknown) as Details[];
 
-  const chartData = (connSync.run(
-    `SELECT
+  const chartData = (connSync.run(`
+    SELECT
       ${name} as name,
       count(${id}) as value
     FROM
       ${table}
     GROUP BY 
-      ${name} COLLATE NOCASE`
-  ) as unknown) as ChartData[];
+      ${name}
+    ORDER BY
+      value DESC
+    LIMIT 10`) as unknown) as ChartData[];
 
   return {
     ...res,
@@ -77,9 +80,18 @@ const getDetails = (
 export const getUsersDetails = (req: Request, res: Response): void => {
   const details = getDetails('id', '0', 'nivel', 'usuarios', 'active');
 
+  details.chartData = details.chartData?.map((data) => ({
+    value: data.value,
+    name: 'Nivel ' + data.name,
+  }));
+
+  const [result] = (connSync.run(`
+    SELECT COUNT(id) as actions FROM (SELECT DISTINCT fecha, performedBy AS id FROM registros);
+  `) as unknown) as { actions: number }[];
+
   res.status(200).json({
     ...details,
-    actions: 0,
+    actions: result.actions,
   });
 };
 
@@ -92,32 +104,24 @@ export const getFilesDetails = (req: Request, res: Response): void => {
     'available'
   );
 
+  const [result] = (connSync.run(`
+    SELECT count(id) AS actions FROM registros WHERE accion='downloaded'
+  `) as unknown) as { actions: number }[];
+
   const parsedSize: string = parseSize(details.totalSize);
   if (details.chartData) {
     details.chartData = details.chartData.map(({ name, value }) => ({
       value,
-      name: name || 'carpeta',
+      name: !name ? 'carpeta' : name === '~' ? 'sin ext' : name,
     }));
   }
 
   res.status(200).json({
     ...details,
-    actions: 0,
+    actions: result.actions,
     parsedSize,
   });
 };
-
-interface Details {
-  totalSize: number;
-  total: number;
-  available: number;
-  disabled: number;
-  chartData?: ChartData[];
-}
-interface ChartData {
-  name: string;
-  value: number;
-}
 
 export const generateFileReport = (req: Request, res: Response) => {
   const { username = 'Yo' } = getTokenKey(req.headers.authorization);
@@ -128,7 +132,7 @@ export const generateFileReport = (req: Request, res: Response) => {
     IFNULL(B.\`usuario\`, A.\`usuario\`) as username,
     \`birthtime\`,
     \`lastModified\`,
-    \`C\`.\`usuario\` as username_mo,
+    IFNULL(\`C\`.\`usuario\`, '-') as username_mo,
     \`size\`
   FROM
     \`archivos\` as A
@@ -147,7 +151,6 @@ export const generateFileReport = (req: Request, res: Response) => {
     return;
   }
 
-  const today = new Date().toLocaleString('es-VE');
   const mappedFiles = result.map((file: IFile) => ({
     ...file,
     birthtime: new Date(file.birthtime).toLocaleString('es-VE'),
@@ -156,22 +159,131 @@ export const generateFileReport = (req: Request, res: Response) => {
       : '-',
   }));
 
-  const templatePath = path.join(__dirname, 'template', 'template.hbs');
-  const html = fs.readFileSync(templatePath, 'UTF-8');
-
-  const report = hbs.compile(html)({
-    username,
-    date: today,
-    files: [...mappedFiles, ...mappedFiles],
-  });
-
-  printPDF(report, (pdf) => {
+  const callback = (pdf) => {
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Length': pdf.length,
     });
     res.send(pdf);
+  };
+
+  compile('template.hbs', mappedFiles, username, callback);
+};
+
+export const getGenericReport = (req: Request, res: Response) => {
+  const { username = 'Yo' } = getTokenKey(req.headers.authorization);
+  const { accion = 'read' } = req.params;
+
+  const query = `
+    SELECT
+      A.\`ino\`,
+      C.\`name\`,
+      IFNULL(B.\`usuario\`, A.\`performedBy\`) as username,
+      A.fecha
+    FROM
+      \`registros\` as A
+    LEFT JOIN
+      \`usuarios\` as B
+    ON
+      A.\`performedBy\` = B.\`id\`
+    INNER JOIN
+      \`archivos\` as  C
+    ON
+      A.\`ino\` = C.\`ino\`
+    WHERE
+      A.accion='${accion}'
+  `;
+  const result = connSync.run(query);
+  if (result.error) {
+    res.status(500).json({ ...result.error });
+    return;
+  }
+
+  const mappedFiles = result.map((row: fileActivity) => ({
+    ...row,
+    fecha: new Date(row.fecha).toLocaleString('es-VE'),
+  }));
+
+  const callback = (pdf) => {
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Length': pdf.length,
+    });
+    res.send(pdf);
+  };
+
+  compile('downloads.hbs', mappedFiles, username, callback);
+};
+
+export const getLogReport = (req: Request, res: Response) => {
+  const { username = 'Yo' } = getTokenKey(req.headers.authorization);
+
+  const query = `
+    SELECT
+      A.fecha,
+      A.performedBy,
+      IFNULL(B.\`usuario\`, A.\`performedBy\`) as username,
+      A.accion,
+      A.campo
+    FROM
+      \`registros\` as A
+    INNEr JOIN
+      \`usuarios\` as B
+    ON
+      A.\`performedBy\` = B.\`id\`
+    WHERE
+      A.accion='login' OR A.accion='check'
+    ORDER BY
+      A.fecha DESC;
+  `;
+  const result = connSync.run(query);
+  if (result.error) {
+    res.status(500).json({ ...result.error });
+    return;
+  }
+  const getStatus = (campo: string): { result: string } => {
+    switch (campo) {
+      case 'inactive':
+        return { result: 'Negado - Inactivo' };
+      case 'fail':
+        return { result: 'Negado - Contraseña incorrecta' };
+      default:
+        return { result: 'Otorgado' };
+    }
+  };
+
+  const mappedFiles = result.map(
+    (row: logActivity): logActivity => ({
+      ...row,
+      ...getStatus(row.campo),
+      performedBy: row.performedBy.slice(-5),
+      fecha: new Date(row.fecha).toLocaleString('es-VE'),
+    })
+  );
+
+  const callback = (pdf) => {
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Length': pdf.length,
+    });
+    res.send(pdf);
+  };
+
+  compile('logs.hbs', mappedFiles, username, callback);
+};
+
+const compile = (template, data, username, cb) => {
+  const today = new Date().toLocaleString('es-VE');
+  const templatePath = path.join(__dirname, 'templates', template);
+  const html = fs.readFileSync(templatePath, 'UTF-8');
+
+  const report = hbs.compile(html)({
+    username,
+    date: today,
+    data: data,
   });
+
+  printPDF(report, cb);
 };
 
 const printPDF = async (content: string, cb: Function) => {
@@ -194,3 +306,29 @@ const printPDF = async (content: string, cb: Function) => {
   // return pdf;
   cb(pdf);
 };
+
+interface Details {
+  totalSize: number;
+  total: number;
+  available: number;
+  disabled: number;
+  chartData?: ChartData[];
+}
+interface ChartData {
+  name: string;
+  value: number;
+}
+interface fileActivity {
+  ino: number;
+  name: string;
+  username: string;
+  fecha: number | string;
+}
+interface logActivity {
+  fecha: number | string;
+  username: string;
+  campo: string;
+  result: string;
+  performedBy: string;
+  accion: string;
+}

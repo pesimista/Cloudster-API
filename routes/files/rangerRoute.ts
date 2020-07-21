@@ -11,6 +11,7 @@ import {
   putFile,
   viewFile,
   removeFile,
+  moveFile,
 } from './rangerController';
 
 // var express = require('express');
@@ -32,6 +33,7 @@ ranger.post('/:ino/folder', Authorization, postFolder);
 
 /* PUT a file */
 ranger.put('/:ino', Authorization, putFile);
+ranger.put('/:folder/:ino', Authorization, moveFile);
 
 /** DELETE a file */
 ranger.delete('/:ino', Authorization, removeFile);

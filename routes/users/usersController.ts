@@ -2,7 +2,7 @@ import { Response, Request } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto, { pbkdf2Sync } from 'crypto';
 import { IUser, IPreguntas } from '../../models/user';
-import { connSync, getTokenKey } from '../../util/util';
+import { connSync, getTokenKey, makeUserReg } from '../../util/util';
 import { IResult } from '../../models/result';
 import { IFile } from '../../models/files';
 import { parseSize } from '../files/rangerController';
@@ -13,6 +13,7 @@ export const getUsers = (
   res: Response,
   sendRes = true
 ): IUser[] => {
+  const { id: tokenID } = getTokenKey(req.headers.authorization);
   const id = req.params.id;
   const query = `SELECT
       \`id\`,
@@ -39,6 +40,7 @@ export const getUsers = (
   if (!sendRes) {
     return (result as unknown) as IUser[];
   } else if (id) {
+    makeUserReg(tokenID, id, 'read');
     res.status(200).send(result[0] || {});
   } else {
     res.status(200).send(result);
@@ -48,7 +50,8 @@ export const getUsers = (
 
 export const checkUser = (req: Request, res: Response): void => {
   const user = getTokenKey(req.headers.authorization);
-  const query = `SELECT
+  const query = `
+    SELECT
       \`id\`,
       \`usuario\`,
       \`nombre\`,
@@ -57,13 +60,13 @@ export const checkUser = (req: Request, res: Response): void => {
       \`pregunta1\`,
       \`pregunta2\`,
       \`nivel\`
-   FROM
+    FROM
       usuarios
-   WHERE
-      key='${user.key}';`;
+    WHERE
+      key='${user.key}';
+  `;
 
   const result = connSync.run(query);
-  console.log(result);
   if (result.error) {
     res.status(500).json({ ...result.error });
     return;
@@ -71,6 +74,7 @@ export const checkUser = (req: Request, res: Response): void => {
     res.status(401).json();
     return;
   }
+  makeUserReg(user.id, '', 'check', '', '', 'success');
   res.status(200).json(result[0]);
 };
 
@@ -87,13 +91,13 @@ export const login = (req: Request, res: Response): void => {
     res.status(400).json({ message: `Faltan datos` });
     return;
   }
-  // let row: IUser;
+
   const result: IResult = connSync.run(`
-      SELECT * FROM usuarios
-         WHERE
-      usuario='${body.usuario.replace(/\'/g, "''")}'
-      COLLATE NOCASE;
-   `);
+    SELECT * FROM usuarios
+      WHERE
+    usuario='${body.usuario.replace(/\'/g, "''")}'
+    COLLATE NOCASE;
+  `);
 
   if (result.error) {
     res.status(500).json({ name: 'SQLite error', message: result.error });
@@ -106,6 +110,7 @@ export const login = (req: Request, res: Response): void => {
     res.status(401).json({ message: `Credenciales incorrectas` });
     return;
   } else if (!row.active) {
+    makeUserReg(row.id, '', 'login', '', '', 'inactive');
     res.status(401).json({
       message: `El usuario se encuentra suspendido. Comuniquese con el adminitrador.`,
     });
@@ -115,33 +120,29 @@ export const login = (req: Request, res: Response): void => {
     row.intentos >= 3
   ) {
     connSync.run(`UPDATE usuarios
-         SET
-            intentos=intentos+1
-         WHERE
-            usuario='${body.usuario.replace(/\'/g, "''")}'
-         COLLATE NOCASE;`);
+      SET
+        intentos=intentos+1
+      WHERE
+        usuario='${body.usuario.replace(/\'/g, "''")}'
+      COLLATE NOCASE;`);
     /* Unathorized */
-    res
-      .status(401)
-      .send(
-        ++row.intentos >= 3
-          ? `Bloqueado por multiples intentos fallidos`
-          : `Credenciales incorrectas.`
-      );
+    makeUserReg(row.id, '', 'login', '', '', 'fail');
+    const message =
+      ++row.intentos >= 3
+        ? `Bloqueado por multiples intentos fallidos`
+        : `Credenciales incorrectas.`;
+    res.status(401).send({ message });
   } else {
-    // makeReg({
-    //    userId: row.id,
-    //    accion: 'login'
-    // });
+    makeUserReg(row.id, '', 'login', '', '', 'success');
     const key = crypto.randomBytes(16).toString('hex');
 
     connSync.run(`
-         UPDATE usuarios SET
-            intentos=0,
-            key='${key}'
-         WHERE
-            usuario='${body.usuario.replace(/\'/g, "''")}'
-         COLLATE NOCASE;`);
+      UPDATE usuarios SET
+        intentos=0,
+        key='${key}'
+      WHERE
+        usuario='${body.usuario.replace(/\'/g, "''")}'
+        COLLATE NOCASE;`);
     const token = hashToken(row, key);
     res.status(200).send({
       response: `Grant access`,
@@ -205,46 +206,47 @@ export const register = (req: Request, res: Response): void => {
     crypto.randomBytes(16).toString('hex'),
   ];
 
-  const result = connSync.run(`INSERT INTO usuarios(
-         \`id\`
-         ,\`nombre\`
-         ,\`apellido\`
-         ,\`password\`
-         ,\`desde\`
-         ,\`usuario\`
-         ,\`pregunta1\`
-         ,\`pregunta2\`
-         ,\`respuesta1\`
-         ,\`respuesta2\`
-         ,\`nivel\`
-         ,\`active\`
-         ,\`key\`
-      ) VALUES(
-         '${id}',
-         '${body.nombre.replace(/\'/g, "''")}',
-         '${body.apellido.replace(/\'/g, "''")}',
-         '${body.password.replace(/\'/g, "''")}',
-         date(),
-         '${body.usuario.replace(/\'/g, "''")}',
-         ${body.pregunta1},
-         ${body.pregunta2},
-         '${body.respuesta1.replace(/\'/g, "''")}',
-         '${body.respuesta2.replace(/\'/g, "''")}',
-         1,
-         1,
-         '${key}'
-      )`);
+  const result = connSync.run(`
+    INSERT INTO usuarios(
+      \`id\`
+      ,\`nombre\`
+      ,\`apellido\`
+      ,\`password\`
+      ,\`desde\`
+      ,\`usuario\`
+      ,\`pregunta1\`
+      ,\`pregunta2\`
+      ,\`respuesta1\`
+      ,\`respuesta2\`
+      ,\`nivel\`
+      ,\`active\`
+      ,\`key\`
+    ) VALUES(
+      '${id}',
+      '${body.nombre.replace(/\'/g, "''")}',
+      '${body.apellido.replace(/\'/g, "''")}',
+      '${body.password.replace(/\'/g, "''")}',
+      date(),
+      '${body.usuario.replace(/\'/g, "''")}',
+      ${body.pregunta1},
+      ${body.pregunta2},
+      '${body.respuesta1.replace(/\'/g, "''")}',
+      '${body.respuesta2.replace(/\'/g, "''")}',
+      1,
+      1,
+      '${key}'
+    )`);
   if (result.error) {
     res.status(500).json({ ...result.error });
     return;
   }
   [row] = (connSync.run(`
-      SELECT * FROM
-         usuarios
-      WHERE
-         usuario='${body.usuario.replace(/\'/g, "''")}'
-      `) as unknown) as IUser[];
-
+    SELECT * FROM
+      usuarios
+    WHERE
+      usuario='${body.usuario.replace(/\'/g, "''")}'
+    `) as unknown) as IUser[];
+  makeUserReg(row.id, '', 'register');
   res.status(200).send({
     response: `Grant access`,
     token: hashToken(row, key),
@@ -267,8 +269,8 @@ export const register = (req: Request, res: Response): void => {
 export const updateUserData = (req: Request, res: Response): void => {
   const body = (req.body as unknown) as IUser;
 
-  const { id, nivel } = getTokenKey(req.headers.authorization);
-
+  const token = getTokenKey(req.headers.authorization);
+  const { id, nivel } = token;
   if (
     (req.params.id !== id && nivel < 5) ||
     (nivel < 5 && body.hasOwnProperty('active'))
@@ -277,8 +279,8 @@ export const updateUserData = (req: Request, res: Response): void => {
     return;
   }
 
-  let [row] = (connSync.run(
-    `SELECT id FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`
+  const [row] = (connSync.run(
+    `SELECT * FROM usuarios WHERE id='${req.params.id}' COLLATE NOCASE;`
   ) as unknown) as IUser[];
   if (!row) {
     res.status(400).json({ message: `El usuario no existe` });
@@ -314,22 +316,50 @@ export const updateUserData = (req: Request, res: Response): void => {
     res.status(500).json({ ...result.error });
     return;
   }
-  [row] = (connSync.run(`
-      SELECT * FROM
-         usuarios
-      WHERE
-         id='${req.params.id}' COLLATE NOCASE;
-      `) as unknown) as IUser[];
+
+  let regQuery = `
+    INSERT INTO registros (
+      performedBy,
+      usuario,
+      accion,
+      old_value,
+      new_value,
+      campo,
+      fecha
+    ) values `;
+  const time = new Date().getTime();
+  Object.keys(row).forEach((key) => {
+    if (body.hasOwnProperty(key) && body[key] !== row[key]) {
+      regQuery += `(
+        '${id}',
+        '${row.id}',
+        'modified',
+        '${row[key].toString()}',
+        '${body[key].toString()}',
+        '${key}',
+        ${time}
+      ),`;
+    }
+  });
+  regQuery.slice(0, -1);
+  connSync.run(regQuery + ';');
+
+  const [newrow] = (connSync.run(`
+    SELECT * FROM
+      usuarios
+    WHERE
+      id='${req.params.id}' COLLATE NOCASE;
+  `) as unknown) as IUser[];
 
   /* Oll Korrect */
   const hideToken = req.params.id !== id;
   res.status(200).json({
     response: `Usuario actualizado`,
-    token: hideToken ? '' : hashToken(row),
+    token: hideToken ? '' : hashToken(newrow),
     user: hideToken
       ? ''
       : {
-          ...row,
+          ...newrow,
           respuesta2: undefined,
           respuesta1: undefined,
           password: undefined,
@@ -485,37 +515,45 @@ export const getFilesByUser = (req: Request, res: Response): void => {
       return { ...f, isFile: f.isFile ? true : false };
     });
 
-  const [{ totalSize }] = (connSync.run(
-    `SELECT SUM(fullSize) as totalSize FROM
-            archivos
-         WHERE
-            usuario = ?
-         AND
-            nivel<=?
-         COLLATE NOCASE`,
-    [user.id, user.nivel]
-  ) as unknown) as { totalSize: number }[];
+  const [{ totalSize = 0 }] = (connSync.run(`
+    SELECT SUM(fullSize) as totalSize FROM
+      archivos
+    WHERE
+      usuario = '${user.id}'
+    AND
+      nivel<=${user.nivel}
+    COLLATE NOCASE`) as unknown) as { totalSize: number }[];
 
-  const chartData = (connSync.run(
-    `SELECT ext as name, count(ino) as value FROM
-            archivos
-         WHERE
-            usuario = ?
-         AND
-            nivel<=?
-         GROUP BY 
-            ext
-         COLLATE NOCASE`,
-    [user.id, user.nivel]
-  ) as unknown) as { name: string; value: number }[];
+  const query = `
+    SELECT ext as name, count(ino) as value FROM
+      archivos
+    WHERE
+      usuario = '${user.id}'
+    AND
+      nivel<=${user.nivel}
+    GROUP BY 
+      ext 
+    ORDER BY
+      value DESC
+    LIMIT 10
+  `;
 
+  const chartData = (connSync.run(query) as unknown) as {
+    name: string;
+    value: number;
+  }[];
   const parsedSize: string = parseSize(totalSize);
+
+  const mappedData = chartData.map(({ name, value }) => ({
+    value,
+    name: !name ? 'carpeta' : name === '~' ? 'sin ext' : name,
+  }));
 
   res.status(200).json({
     files,
     totalSize,
     parsedSize,
-    chartData,
+    chartData: mappedData,
   });
 };
 

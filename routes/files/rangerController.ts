@@ -6,9 +6,9 @@ import {
   connSync,
   getTokenKey,
   getLocalPage,
-  makeReg
+  makeFileReg,
 } from '../../util/util';
-import { IUser } from '../../models/user';
+import { SIGSEGV } from 'constants';
 
 /* Defines whether or not the data base is being updated */
 export let updating: boolean = false;
@@ -32,10 +32,11 @@ export const initializeServer = (): void => {
   /* The files that are currently active in the folder */
   const files = loadFiles(cwd);
 
-  let rows: IFile[] = connSync
-    .run(`SELECT ino, name from archivos`) as unknown as IFile[];
+  let rows: IFile[] = (connSync.run(
+    `SELECT ino, name from archivos`
+  ) as unknown) as IFile[];
 
-  rows.forEach(({ino: currentIno, name}) => {
+  rows.forEach(({ ino: currentIno, name }) => {
     const selected: IFile = files.find((f) => f.ino === currentIno) as IFile;
 
     /* If the file doesn't exist in the current folder, marks it as unavailable */
@@ -61,7 +62,7 @@ export const initializeServer = (): void => {
     }
     console.log('\x1b[34mUpdate \x1b[36m SYNC\x1b[0m ' + currentIno);
   }); // foreach
-  const inoArray = rows.map(({ino}) => ino);
+  const inoArray = rows.map(({ ino }) => ino);
   checkFiles(inoArray, files);
 };
 
@@ -231,7 +232,11 @@ const insertQuery = (file: IFile, user: string = 'Cloudster'): string => {
  * it DOES delete them
  * @param ino
  */
-const deleteFileSync = (ino: number, fileName: string, userID: string = 'Cloudster' ): boolean => {
+const deleteFileSync = (
+  ino: number,
+  fileName: string,
+  userID: string = 'Cloudster'
+): boolean => {
   const res = connSync.run(`
     DELETE FROM
       archivos
@@ -239,7 +244,7 @@ const deleteFileSync = (ino: number, fileName: string, userID: string = 'Cloudst
       ino = ${ino}`);
   if (res.error) return false;
 
-  makeReg(userID, ino, 'deleted', fileName);
+  makeFileReg(userID, ino, 'deleted', fileName);
 
   console.log('\x1b[32mDELETE \x1b[36mSYNC \x1b[0m ' + ino);
 
@@ -294,7 +299,7 @@ export const getFilesInDirectory = (req: Request, res: Response): void => {
       AND available=1
     COLLATE NOCASE`
   );
-    
+
   const query = `INSERT INTO registros (
     usuario,
     ino,
@@ -311,10 +316,10 @@ export const getFilesInDirectory = (req: Request, res: Response): void => {
     dependency=${file[key]}
     AND nivel<=${nivel}
     AND available=1
-  COLLATE NOCASE`
+  COLLATE NOCASE`;
   connSync.run(query);
 
-  const files: IFile[] = connSync.run(
+  const files: IFile[] = (connSync.run(
     `SELECT 
       \`archivos\`.\`id\`,
       \`archivos\`.\`ino\`,
@@ -339,14 +344,14 @@ export const getFilesInDirectory = (req: Request, res: Response): void => {
       AND archivos.nivel<=${nivel}
       AND available=1
     COLLATE NOCASE`
-  ) as unknown as IFile[];
+  ) as unknown) as IFile[];
 
   res.status(200).json(
     files.map((f) => {
       return {
         ...f,
         isFile: Boolean(f.isFile),
-        birthtime: new Date(f.birthtime)
+        birthtime: new Date(f.birthtime),
       };
     })
   );
@@ -358,10 +363,10 @@ export const getParent = (req: Request, res: Response): void => {
   if (nivel === -1) return;
 
   const parent = findFile(file.dependency);
-  makeReg(user.id, parent.ino, 'read');
+  makeFileReg(user.id, parent.ino, 'read');
   res.status(200).json({
     ...parent,
-    isFile: Boolean(parent.isFile)
+    isFile: Boolean(parent.isFile),
   });
 };
 
@@ -373,7 +378,7 @@ export const getParent = (req: Request, res: Response): void => {
 export const getFileInfo = (req: Request, res: Response): void => {
   const [nivel, file, user] = verifyPermission(req, res);
   if (nivel === -1) return;
-  makeReg(user, file.ino, 'read');
+  makeFileReg(user, file.ino, 'read');
   res.status(200).json(file);
 };
 
@@ -398,7 +403,7 @@ export const downloadFile = (req: Request, res: Response): void => {
       usuario_do='${usuario.id}
     WHERE ino=${file.ino};
   `);
-  makeReg(usuario.id, file.ino, 'downloaded');
+  makeFileReg(usuario.id, file.ino, 'downloaded');
   res.status(200).download(route);
 };
 
@@ -429,7 +434,7 @@ export const viewFile = (req: Request, res: Response): void => {
       usuario_do='${usuario.id}'
     WHERE ino=${file.ino};
   `);
-  makeReg(usuario.id, file.ino, 'downloaded');
+  makeFileReg(usuario.id, file.ino, 'downloaded');
   res.status(200).sendFile(route);
 };
 
@@ -463,27 +468,33 @@ export const postFile = (req: Request, res: Response): void => {
     }
     const file = generateFile(final, baseDir, ino, -1);
     insertFileSync(file, token.id);
-    makeReg(token.id, file.ino, 'uploaded');
+    makeFileReg(token.id, file.ino, 'uploaded');
     res.status(200).json({ message: 'Recibido' });
   } catch (e) {
-    if (e && e.message.includes('cross-device link not permitted')) {
-      const is = fs.createReadStream(req.file.path);
-      const os = fs.createWriteStream(newName);
-      is.pipe(os);
-      is.on('end', () => {
-        fs.unlinkSync(req.file.path);
-        const file = generateFile(final, baseDir, ino, -1);
-        const response = insertFileSync(file, token.id);
-        if (!response){
-          return res.status(500).json({
-            message: `I'm fucking tired already, I just wanna leave it right here.
-                     \nAh right!, something bad happened so...`,
-          });
-        }
-        makeReg(token.id, file.ino, 'uploaded');
-        res.status(200).json({ message: 'Recibido' });
-      });
-    } else res.status(500).json({ message: e.message });
+    if (!e || !e.message.includes('cross-device link not permitted')) {
+      res.status(500).json({ message: e.message });
+    }
+
+    const is = fs.createReadStream(req.file.path);
+    const os = fs.createWriteStream(newName);
+
+    is.pipe(os);
+    is.on('end', () => {
+      fs.unlinkSync(req.file.path);
+
+      const file = generateFile(final, baseDir, ino, -1);
+      const response = insertFileSync(file, token.id);
+
+      if (!response) {
+        return res.status(500).json({
+          message: `I'm fucking tired already, I just wanna leave it right here.
+                    \nAh right!, something bad happened so...`,
+        });
+      }
+
+      makeFileReg(token.id, file.ino, 'uploaded');
+      res.status(200).json({ message: 'Recibido' });
+    });
   }
 };
 
@@ -512,7 +523,7 @@ export const postFolder = (req: Request, res: Response): void => {
   }
   const folder = generateFile(newName, route, file.ino, -1);
   insertFileSync(folder, user.id);
-  makeReg(user.id, folder.ino, 'uploaded');
+  makeFileReg(user.id, folder.ino, 'uploaded');
   res
     .status(200)
     .json({ message: `carpeta ${newName} creada en ${file.name}` });
@@ -568,7 +579,7 @@ export const putFile = (req: Request, res: Response): void => {
         usuario_mo='${user.id}'
       WHERE ino=${ino};
     `);
-    makeReg(user.id, file.ino, 'modified', file.name, final);
+    makeFileReg(user.id, file.ino, 'modified', file.name, final, 'name');
     if (response.error) res.status(500).json(response);
   }
 
@@ -584,7 +595,14 @@ export const putFile = (req: Request, res: Response): void => {
     return;
   }
 
-  makeReg(user.id, ino, 'modified', file.nivel.toString(), nivel.toString());
+  makeFileReg(
+    user.id,
+    ino,
+    'modified',
+    file.nivel.toString(),
+    nivel.toString(),
+    'nivel'
+  );
   res.status(200).json({ message: 'Oll korrect' });
 };
 
@@ -612,14 +630,19 @@ export const removeFile = (req: Request, res: Response): void => {
     return;
   }
 
-  const result = markUnavailableSync(+req.params.ino, +!file.available, user.id);
+  const result = markUnavailableSync(
+    +req.params.ino,
+    +!file.available,
+    user.id
+  );
 
-  makeReg(
+  makeFileReg(
     user.id,
     +req.params.ino,
     'modified',
     (!file.available).toString(),
-    Boolean(file.available).toString()
+    Boolean(file.available).toString(),
+    'available'
   );
 
   if (result) {
@@ -632,7 +655,11 @@ export const removeFile = (req: Request, res: Response): void => {
   res.status(500).json({ response: 'Algo salió mal' });
 };
 
-const markUnavailableSync = (ino: number, value: number, userID: string): boolean => {
+const markUnavailableSync = (
+  ino: number,
+  value: number,
+  userID: string
+): boolean => {
   const res = connSync.run(`
     UPDATE archivos SET
       available = ${value},
@@ -640,6 +667,88 @@ const markUnavailableSync = (ino: number, value: number, userID: string): boolea
       usuario_mo='${userID}'
     WHERE ino = ${ino} COLLATE NOCASE`);
   return !Boolean(res.error);
+};
+
+export const moveFile = (req: Request, res: Response): void => {
+  const folder = findFile(req.params.folder);
+  const file = findFile(req.params.ino);
+  const token = getTokenKey(req.headers.authorization);
+
+  if (!folder || !file) {
+    res.status(400).json({ response: 'Carpeta o archivo no encontrado' });
+    return;
+  }
+  if (folder.ino === file.dependency) {
+    res.status(200).json({ message: 'Listo' });
+  }
+  const newName = setNewName(file.name, folder.ino);
+
+  const oldPath = getFileFullPath(file);
+  const newPath = getFileFullPath({
+    ...file,
+    name: newName,
+    dependency: folder.ino,
+  });
+  console.log(oldPath, newPath);
+
+  const result = connSync.run(`
+    UPDATE
+      archivos
+    SET
+      name='${newName.replace(/\'/g, "''")}',
+      dependency=${folder.ino}
+    WHERE
+      ino=${file.ino}
+  `);
+
+  if (result.error) {
+    res.status(500).json({ error: result.error });
+    return;
+  }
+  makeFileReg(
+    token.id,
+    file.ino,
+    'modified',
+    file.dependency?.toString(),
+    folder.ino?.toString(),
+    'dependency'
+  );
+  if (file.name !== newName) {
+    makeFileReg(token.id, file.ino, 'modified', file.name, newName, 'name');
+  }
+
+  const onError = (error: any) => {
+    res.status(500).json({ error: error });
+  };
+  const move = () => {
+    var readStream = fs.createReadStream(oldPath);
+    var writeStream = fs.createWriteStream(newPath);
+
+    readStream.on('error', onError);
+    writeStream.on('error', onError);
+    console.log('moving');
+    readStream.on('close', () => {
+      fs.unlinkSync(oldPath);
+      console.log('Closed');
+      res.status(200).json({ message: 'Listo' });
+    });
+
+    readStream.pipe(writeStream);
+  };
+
+  try {
+    fs.renameSync(oldPath, newPath);
+    res.status(200).json({ message: 'Listo' });
+  } catch (err) {
+    if (err) {
+      if (err.code === 'EXDEV') {
+        move();
+      } else {
+        onError(err);
+      }
+      return;
+    }
+  }
 };
 
 /**
@@ -703,7 +812,9 @@ const verifyPermission = (
     req.headers.authorization || 'bearer ' + req.query.token
   );
 
-  const [user] = connSync.run(`SELECT * FROM usuarios WHERE key='${key}' COLLATE NOCASE`) as unknown as IFile[];
+  const [user] = (connSync.run(
+    `SELECT * FROM usuarios WHERE key='${key}' COLLATE NOCASE`
+  ) as unknown) as IFile[];
 
   if (!req.params.ino) return [user.nivel, { ino: 0 }, user];
 
@@ -760,11 +871,11 @@ export const findFile = (ino: string | number = 0): IFile => {
       size: '0.00 Bytes',
       nivel: 1,
       usuario: 'Cloudster',
-      upBy: 'Cloudster'
+      upBy: 'Cloudster',
     };
   }
 
-  const [file]: IFile[] = connSync.run(`
+  const [file]: IFile[] = (connSync.run(`
     SELECT 
       \`archivos\`.\`id\`,
       \`archivos\`.\`ino\`,
@@ -787,9 +898,8 @@ export const findFile = (ino: string | number = 0): IFile => {
       \`archivos\`.\`usuario\` = \`usuarios\`.\`id\`
     WHERE
       ino=${ino}
-  `
-  ) as unknown as IFile[];
-  
+  `) as unknown) as IFile[];
+
   if (!file) return file;
   return {
     ...file,
@@ -823,6 +933,7 @@ const setNewName = (fileName: string, ino: number = 0): string => {
  * @param size full size
  */
 export const parseSize = (size: number): string => {
+  if (!size) size = 0;
   if (size < 1024) return `${size.toFixed(2)} Bytes`;
 
   size = size / 1024;

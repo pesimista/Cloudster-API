@@ -151,28 +151,61 @@ export const getLocalPage = (pageName: string = 'notFound.html'): string => {
   return path.join(dir, 'pages', 'notFound.html');
 };
 
-export const makeReg = (
-  userID: string,
+export const makeFileReg = async (
+  performedBy: string,
   ino: number,
-  accion: 'read' | 'downloaded' | 'modified' | 'uploaded' | 'deleted', 
+  accion: 'read' | 'downloaded' | 'modified' | 'uploaded' | 'deleted',
   oldVal: string = '',
-  newVal: string = ''
-) => {
+  newVal: string = '',
+  campo: string = ''
+): Promise<boolean> => {
   const res = connSync.run(`
     INSERT INTO registros (
-      usuario,
+      performedBy,
       ino,
       accion,
       old_value,
       new_value,
+      campo,
       fecha
     ) values (
-      '${userID}',
-      ${ino},
+      '${performedBy}',
+       ${ino},
       '${accion}',
       '${oldVal}',
       '${newVal}',
+      '${campo}',
       ${new Date().getTime()}
     )
   `);
-}
+  return Boolean(res.error);
+};
+export const makeUserReg = async (
+  performedBy: string,
+  userID: string,
+  accion: 'login' | 'check' | 'register' | 'modified' | 'read',
+  oldVal: string = '',
+  newVal: string = '',
+  campo: string = ''
+): Promise<boolean> => {
+  const res = connSync.run(`
+    INSERT INTO registros (
+      performedBy,
+      usuario,
+      accion,
+      old_value,
+      new_value,
+      campo,
+      fecha
+    ) values (
+      '${performedBy}',
+      '${userID}',
+      '${accion}',
+      '${oldVal}',
+      '${newVal}',
+      '${campo}',
+      ${new Date().getTime()}
+    )
+  `);
+  return Boolean(res.error);
+};
