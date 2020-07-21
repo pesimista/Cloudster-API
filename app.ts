@@ -99,5 +99,5 @@ const getColor = (method: string) => {
   return color + method.toUpperCase();
 };
 
-setDirectory(__dirname);
+setDirectory(path.join(__dirname, 'temp'));
 export default app;
