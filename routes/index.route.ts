@@ -14,7 +14,5 @@ router.get('/:page', (req: Request, res: Response, next: NextFunction) => {
   else res.status(404).sendFile(path.join(dir, 'pages', 'notFound.html'));
 });
 
-router.get;
-
 // module.exports = router;
 export default router;

@@ -32,7 +32,7 @@ export const initializeServer = (): void => {
   /* The files that are currently active in the folder */
   const files = loadFiles(cwd);
 
-  let rows: IFile[] = (connSync.run(
+  const rows: IFile[] = (connSync.run(
     `SELECT ino, name from archivos`
   ) as unknown) as IFile[];
 
@@ -57,10 +57,10 @@ export const initializeServer = (): void => {
       WHERE ino = ${currentIno} COLLATE NOCASE
       `);
     if (update.error) {
-      console.log('\x1b[31mUpdate \x1b[36m SYNC\x1b[0m ');
+      // console.log('\x1b[31mUpdate \x1b[36m SYNC\x1b[0m ');
       return;
     }
-    console.log('\x1b[34mUpdate \x1b[36m SYNC\x1b[0m ' + currentIno);
+    // console.log('\x1b[34mUpdate \x1b[36m SYNC\x1b[0m ' + currentIno);
   }); // foreach
   const inoArray = rows.map(({ ino }) => ino);
   checkFiles(inoArray, files);
@@ -184,13 +184,13 @@ const insertFileSync = (file: IFile, user: string = 'Cloudster'): boolean => {
   const query = insertQuery(file, user);
   const res = connSync.run(query);
   if (res.error) {
-    console.log('\x1b[32mINSERT \x1b[36m SYNC \x1b[0m ' + file.ino);
-    console.error(res.error);
+    // console.log('\x1b[32mINSERT \x1b[36m SYNC \x1b[0m ' + file.ino);
+    // console.error(res.error);
     return false;
   }
-  console.log(
-    '\x1b[33mINSERT \x1b[36m SYNC \x1b[0m ' + file.ino + ' ' + file.name
-  );
+  /*console.log(
+  '\x1b[33mINSERT \x1b[36m SYNC \x1b[0m ' + file.ino + ' ' + file.name
+  );*/
   return true;
 };
 /**
@@ -246,7 +246,7 @@ const deleteFileSync = (
 
   makeFileReg(userID, ino, 'deleted', fileName);
 
-  console.log('\x1b[32mDELETE \x1b[36mSYNC \x1b[0m ' + ino);
+  // console.log('\x1b[32mDELETE \x1b[36mSYNC \x1b[0m ' + ino);
 
   const dep: IFile[] = (connSync.run(
     `SELECT ino, name FROM archivos WHERE dependency=${+ino} COLLATE NOCASE`
@@ -305,7 +305,7 @@ export const getFilesInDirectory = (req: Request, res: Response): void => {
     ino,
     accion,
     fecha
-  ) SELECT 
+  ) SELECT
     '${usuario.id}' as usuario,
     ino,
     'read' as accion,
@@ -320,7 +320,7 @@ export const getFilesInDirectory = (req: Request, res: Response): void => {
   connSync.run(query);
 
   const files: IFile[] = (connSync.run(
-    `SELECT 
+    `SELECT
       \`archivos\`.\`id\`,
       \`archivos\`.\`ino\`,
       \`archivos\`.\`name\`,
@@ -548,7 +548,8 @@ export const putFile = (req: Request, res: Response): void => {
     return;
   }
 
-  let { nivel = 0, name = '' } = req.body as IFile;
+  let { nivel = 0 } = req.body as IFile;
+  const { name = '' } = req.body as IFile;
   if (!nivel) {
     nivel = file.nivel;
   } else if (nivel > userLevel) {
@@ -689,7 +690,7 @@ export const moveFile = (req: Request, res: Response): void => {
     name: newName,
     dependency: folder.ino,
   });
-  console.log(oldPath, newPath);
+  // console.log(oldPath, newPath);
 
   const result = connSync.run(`
     UPDATE
@@ -718,18 +719,18 @@ export const moveFile = (req: Request, res: Response): void => {
   }
 
   const onError = (error: any) => {
-    res.status(500).json({ error: error });
+    res.status(500).json({ error });
   };
   const move = () => {
-    var readStream = fs.createReadStream(oldPath);
-    var writeStream = fs.createWriteStream(newPath);
+    const readStream = fs.createReadStream(oldPath);
+    const writeStream = fs.createWriteStream(newPath);
 
     readStream.on('error', onError);
     writeStream.on('error', onError);
-    console.log('moving');
+    // console.log('moving');
     readStream.on('close', () => {
       fs.unlinkSync(oldPath);
-      console.log('Closed');
+      // console.log('Closed');
       res.status(200).json({ message: 'Listo' });
     });
 
@@ -765,37 +766,37 @@ export const setDirectory = (dir: string): boolean => {
   cwd = dir;
 
   initializeServer();
-  debugger;
   return true;
-  // try {
-  //    fs.accessSync(dir);
-  //    let directory = fs.readFileSync(dir + _ + 'folder', 'utf-8');
-  //    try {
-  //       fs.accessSync(directory);
-  //       cwd = directory;
-  //
-  //       return true;
-  //    }
-  //    catch (e) {
-  //       console.log(directory);
-  //       console.log(`La direccion en el archivo 'Directorio.txt' no es valida`);
-  //       console.log(`Corrija y vuelva a intentarlo`);
-  //       return false;
-  //    }
-  // }
-  // catch (err) {
-  //    console.log('--------------    Creando Directorio.txt    --------------');
-  //    try {
-  //       fs.writeFileSync('dir', dir + _ + 'folder', 'utf8');
-  //       initializeServer();
-  //       return true;
-  //    }
-  //    catch (e) {
-  //       console.log('Ha ocurrido un error al inicializar.');
-  //       return false;
-  //       process.exit();
-  //    }
-  // }
+  /*
+  try {
+    fs.accessSync(dir);
+    let directory = fs.readFileSync(dir + _ + 'folder', 'utf-8');
+    try {
+      fs.accessSync(directory);
+      cwd = directory;
+
+      return true;
+    }
+    catch (e) {
+      console.log(directory);
+      console.log(`La direccion en el archivo 'Directorio.txt' no es valida`);
+      console.log(`Corrija y vuelva a intentarlo`);
+      return false;
+    }
+  }
+  catch (err) {
+    console.log('--------------    Creando Directorio.txt    --------------');
+    try {
+      fs.writeFileSync('dir', dir + _ + 'folder', 'utf8');
+      initializeServer();
+      return true;
+    }
+    catch (e) {
+      console.log('Ha ocurrido un error al inicializar.');
+      return false;
+      process.exit();
+    }
+  }*/
 };
 
 /**
@@ -876,7 +877,7 @@ export const findFile = (ino: string | number = 0): IFile => {
   }
 
   const [file]: IFile[] = (connSync.run(`
-    SELECT 
+    SELECT
       \`archivos\`.\`id\`,
       \`archivos\`.\`ino\`,
       \`archivos\`.\`name\`,

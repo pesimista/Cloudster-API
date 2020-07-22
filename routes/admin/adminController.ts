@@ -5,7 +5,7 @@ import { parseSize } from '../files/rangerController';
 import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
-import hbs, { template } from 'handlebars';
+import hbs from 'handlebars';
 // import ranger from "./ranger";
 
 /**
@@ -65,7 +65,7 @@ const getDetails = (
       count(${id}) as value
     FROM
       ${table}
-    GROUP BY 
+    GROUP BY
       ${name}
     ORDER BY
       value DESC
@@ -199,7 +199,7 @@ export const getGenericReport = (req: Request, res: Response) => {
     return;
   }
 
-  const mappedFiles = result.map((row: fileActivity) => ({
+  const mappedFiles = result.map((row: FileActivity) => ({
     ...row,
     fecha: new Date(row.fecha).toLocaleString('es-VE'),
   }));
@@ -253,7 +253,7 @@ export const getLogReport = (req: Request, res: Response) => {
   };
 
   const mappedFiles = result.map(
-    (row: logActivity): logActivity => ({
+    (row: LogActivity): LogActivity => ({
       ...row,
       ...getStatus(row.campo),
       performedBy: row.performedBy.slice(-5),
@@ -280,13 +280,13 @@ const compile = (template, data, username, cb) => {
   const report = hbs.compile(html)({
     username,
     date: today,
-    data: data,
+    data,
   });
 
   printPDF(report, cb);
 };
 
-const printPDF = async (content: string, cb: Function) => {
+const printPDF = async (content: string, cb: (pdf: any) => void) => {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
 
@@ -318,13 +318,13 @@ interface ChartData {
   name: string;
   value: number;
 }
-interface fileActivity {
+interface FileActivity {
   ino: number;
   name: string;
   username: string;
   fecha: number | string;
 }
-interface logActivity {
+interface LogActivity {
   fecha: number | string;
   username: string;
   campo: string;

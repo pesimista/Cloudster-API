@@ -20,13 +20,10 @@ export const connSync = {
     const columns = res[0]?.columns;
 
     if (res.error || (query.includes('*') && !columns) || !columns) {
-      // console.log('Direct');
       return res;
     }
 
     const [rows] = res;
-    console.log(rows);
-
     const keys = rows.columns;
 
     return rows.values.map((arr) => {
@@ -53,7 +50,6 @@ export const Authorization = (
 ) => {
   const token = req.headers.authorization || 'bearer ' + req.query.token;
   if (!token || !token.toLocaleLowerCase().startsWith('bearer ')) {
-    console.log('invalid token or null');
     res.status(401).json({ message: 'Unanthorized 1 invalid token or null' });
     return;
   }
@@ -71,7 +67,6 @@ export const Authorization = (
 
   try {
     if (!decoded.key || !decoded.id) {
-      console.log('Invalid token; not key nor id');
       res
         .status(401)
         .json({ message: 'Unanthorized 2 Invalid token; not key nor id' });
@@ -104,14 +99,14 @@ export const AdminAuth = (req: Request, res: Response, next: NextFunction) => {
   const decoded = getTokenKey(token);
 
   const rows = connSync.run(`
-      SELECT 
-         nivel 
-      FROM 
-         usuarios 
-      WHERE 
-         id='${decoded.id.trim()}' 
-      AND 
-         key='${decoded.key.trim()}' 
+      SELECT
+         nivel
+      FROM
+         usuarios
+      WHERE
+         id='${decoded.id.trim()}'
+      AND
+         key='${decoded.key.trim()}'
       COLLATE NOCASE
    `);
 
