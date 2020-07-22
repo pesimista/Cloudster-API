@@ -104,7 +104,6 @@ export const login = (req: Request, res: Response): void => {
     return;
   }
   const [row] = (result as unknown) as IUser[];
-  // console.log(row);
   if (!row) {
     /* Unathorized */
     res.status(401).json({ message: `Credenciales incorrectas` });
@@ -531,8 +530,8 @@ export const getFilesByUser = (req: Request, res: Response): void => {
       usuario = '${user.id}'
     AND
       nivel<=${user.nivel}
-    GROUP BY 
-      ext 
+    GROUP BY
+      ext
     ORDER BY
       value DESC
     LIMIT 10

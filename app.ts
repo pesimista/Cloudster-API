@@ -23,7 +23,6 @@ app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-console.clear();
 // app.use(express.static(path.join(__dirname, 'public')));
 
 /**
@@ -32,8 +31,6 @@ console.clear();
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', '*');
-
-  // console.log(`\n${getColor(req.method)}\t\x1b[36m'${req.originalUrl}'\x1b[0m\t `)
 
   /* Pa que no aparezca en gris el req >///< */
   if (req.method === 'OPTIONS') {
