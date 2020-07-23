@@ -52,7 +52,7 @@ app.use('/api', index_route_1.default);
 app.use('/api', index_route_1.default);
 app.use(express_1.default.static(exports.distParent));
 app.use(express_1.default.static(path_1.default.join(exports.distParent, 'build')));
-app.get('/*', (req, res) => {
+app.get('/', (req, res) => {
     res.sendFile(path_1.default.join(exports.distParent, 'build', 'index.html'));
 });
 /**
