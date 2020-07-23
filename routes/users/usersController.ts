@@ -169,23 +169,23 @@ export const register = (req: Request, res: Response): void => {
   /* Validar que tenga todos los campos */
   if (!body.usuario) {
     /* BadRequest */
-    res.status(400).send(`Falta Usuario!`);
+    res.status(400).json({code: 1 ,message: `Falta Usuario!`});
     return;
   } else if (!body.nombre) {
     /* BadRequest */
-    res.status(400).send(`Falta nombre!`);
+    res.status(400).json({code: 2 ,message: `Falta nombre!`});
     return;
   } else if (!body.password) {
     /* BadRequest */
-    res.status(400).send(`Falta contraseña`);
+    res.status(400).json({code: 3 ,message: `Falta contraseña`});
     return;
   } else if (!body.pregunta1 || !body.pregunta2) {
     /* BadRequest */
-    res.status(400).send(`Falta pregunta secreta`);
+    res.status(400).json({code: 4 ,message: `Falta pregunta secreta`});
     return;
   } else if (!body.respuesta1 || !body.respuesta2) {
     /* BadRequest */
-    res.status(400).send(`Falta respuesta a la pregunta secreta`);
+    res.status(400).json({code: 5 ,message: `Falta respuesta a la pregunta secreta`});
     return;
   }
   /* Llegados a este punto se asume que tiene todos los campos */
@@ -197,13 +197,10 @@ export const register = (req: Request, res: Response): void => {
       `) as unknown) as IUser[];
 
   if (!row) {
-    res.status(400).send(`El nombre de usuario ya existe`);
+    res.status(400).json({code: 6 ,message: `El nombre de usuario ya existe`});
     return;
   }
-  const [key, id] = [
-    crypto.randomBytes(16).toString('hex'),
-    crypto.randomBytes(16).toString('hex'),
-  ];
+  const id = crypto.randomBytes(16).toString('hex');
 
   const result = connSync.run(`
     INSERT INTO usuarios(
@@ -219,7 +216,6 @@ export const register = (req: Request, res: Response): void => {
       ,\`respuesta2\`
       ,\`nivel\`
       ,\`active\`
-      ,\`key\`
     ) VALUES(
       '${id}',
       '${body.nombre.replace(/\'/g, "''")}',
@@ -232,8 +228,7 @@ export const register = (req: Request, res: Response): void => {
       '${body.respuesta1.replace(/\'/g, "''")}',
       '${body.respuesta2.replace(/\'/g, "''")}',
       1,
-      1,
-      '${key}'
+      0,
     )`);
   if (result.error) {
     res.status(500).json({ ...result.error });
@@ -246,16 +241,8 @@ export const register = (req: Request, res: Response): void => {
       usuario='${body.usuario.replace(/\'/g, "''")}'
     `) as unknown) as IUser[];
   makeUserReg(row.id, '', 'register');
-  res.status(200).send({
-    response: `Grant access`,
-    token: hashToken(row, key),
-    user: {
-      ...row,
-      respuesta2: undefined,
-      respuesta1: undefined,
-      password: undefined,
-      intentos: undefined,
-    },
+  res.status(200).json({
+    message: `Registrado satisfactoriamente. Contacta a un administrados para que active tu cuenta.`,
   });
 };
 

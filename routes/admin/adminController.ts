@@ -124,7 +124,11 @@ export const getFilesDetails = (req: Request, res: Response): void => {
 };
 
 export const generateFileReport = (req: Request, res: Response) => {
-  const { username = 'Yo' } = getTokenKey(req.headers.authorization);
+  const { username = '' } = getTokenKey(req.headers.authorization);
+  if (!username) {
+    res.status(401).json({message: 'No token'});
+    return;
+  }
 
   const query = `SELECT
     \`ino\`,
@@ -171,7 +175,11 @@ export const generateFileReport = (req: Request, res: Response) => {
 };
 
 export const getGenericReport = (req: Request, res: Response) => {
-  const { username = 'Yo' } = getTokenKey(req.headers.authorization);
+  const { username = '' } = getTokenKey(req.headers.authorization);
+  if (!username) {
+    res.status(401).json({message: 'No token'});
+    return;
+  }
   const { accion = 'read' } = req.params;
 
   const query = `
@@ -274,7 +282,8 @@ export const getLogReport = (req: Request, res: Response) => {
 
 const compile = (template, data, username, cb) => {
   const today = new Date().toLocaleString('es-VE');
-  const templatePath = path.join(__dirname, 'templates', template);
+  const root = path.dirname(path.dirname(__dirname));
+  const templatePath = path.join(root, 'templates', template);
   const html = fs.readFileSync(templatePath, 'UTF-8');
 
   const report = hbs.compile(html)({
