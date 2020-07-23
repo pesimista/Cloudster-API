@@ -33,7 +33,7 @@ export const getUsers = (
 
   const result = connSync.run(query + where);
   if (result.error) {
-    res.status(500).json({ ...result.error });
+    res.status(500).json({ message: result.error });
     return [];
   }
 
@@ -68,7 +68,7 @@ export const checkUser = (req: Request, res: Response): void => {
 
   const result = connSync.run(query);
   if (result.error) {
-    res.status(500).json({ ...result.error });
+    res.status(500).json({ message: result.error });
     return;
   } else if (!result[0]) {
     res.status(401).json();
@@ -189,14 +189,18 @@ export const register = (req: Request, res: Response): void => {
     return;
   }
   /* Llegados a este punto se asume que tiene todos los campos */
-  let [row] = (connSync.run(`
+  const userExists = connSync.run(`
       SELECT 1 FROM
          usuarios
       WHERE
          usuario='${body.usuario.replace(/\'/g, "''")}'
-      `) as unknown) as IUser[];
+      `);
 
-  if (!row) {
+  if(userExists.error) {
+    res.status(500).json({error: userExists.error});
+    return;
+  }
+  if (userExists[0]) {
     res.status(400).json({code: 6 ,message: `El nombre de usuario ya existe`});
     return;
   }
@@ -220,7 +224,7 @@ export const register = (req: Request, res: Response): void => {
       '${id}',
       '${body.nombre.replace(/\'/g, "''")}',
       '${body.apellido.replace(/\'/g, "''")}',
-      '${body.password.replace(/\'/g, "''")}',
+      '${body.password}',
       date(),
       '${body.usuario.replace(/\'/g, "''")}',
       ${body.pregunta1},
@@ -228,13 +232,13 @@ export const register = (req: Request, res: Response): void => {
       '${body.respuesta1.replace(/\'/g, "''")}',
       '${body.respuesta2.replace(/\'/g, "''")}',
       1,
-      0,
+      0
     )`);
   if (result.error) {
     res.status(500).json({ ...result.error });
     return;
   }
-  [row] = (connSync.run(`
+  const [row] = (connSync.run(`
     SELECT * FROM
       usuarios
     WHERE
@@ -242,7 +246,7 @@ export const register = (req: Request, res: Response): void => {
     `) as unknown) as IUser[];
   makeUserReg(row.id, '', 'register');
   res.status(200).json({
-    message: `Registrado satisfactoriamente. Contacta a un administrados para que active tu cuenta.`,
+    message: `Registrado satisfactoriamente. Contacta a un administrador para que active tu cuenta.`,
   });
 };
 
@@ -299,7 +303,7 @@ export const updateUserData = (req: Request, res: Response): void => {
   /* runs the update query  */
   const result = connSync.run(query);
   if (result.error) {
-    res.status(500).json({ ...result.error });
+    res.status(500).json({ message: result.error });
     return;
   }
 
@@ -368,7 +372,7 @@ export const deleteUser = (req: Request, res: Response): void => {
 
   const result = connSync.run(query);
   if (result.error) {
-    res.status(500).json({ ...result });
+    res.status(500).json({ message: result.error });
     return;
   }
 
@@ -460,7 +464,7 @@ export const checkUserQuestions = (req: Request, res: Response): void => {
 
   const rows: IResult = connSync.run(query);
   if (rows.error) {
-    res.status(500).json(rows.error);
+    res.status(500).json({message: rows.error});
     return;
   }
 

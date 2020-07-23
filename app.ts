@@ -1,3 +1,7 @@
+import path from 'path';
+export const distParent = path.dirname(__dirname);
+// export const distParent = __dirname;
+
 import compression from 'compression';
 import express, { Application, NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
@@ -8,7 +12,6 @@ import adminRouter from './routes/admin/adminRoute';
 import indexRouter from './routes/index.route';
 import { getQuestions } from './routes/users/usersController';
 import usersRouter from './routes/users/usersRoute';
-import path from 'path';
 
 /* Instantiate app */
 const app: Application = express();
@@ -50,32 +53,15 @@ app.get('/api/questions', getQuestions);
 app.use('/api/files', filesRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api', indexRouter);
-app.use('/', (req: Request, res: Response, next: NextFunction) => {
-  res.send('AYUDAMEDIOS');
+app.use('/api', indexRouter);
+
+app.use(express.static(distParent));
+app.use(express.static(path.join(distParent, 'build')));
+
+app.get('/*', (req, res) => {
+  res.sendFile(path.join(distParent, 'build', 'index.html'));
 });
-app.use('/*', (req, res) => {
-  res.status(404).send();
-});
 
-// // catch 404 and forward to error handler
-// app.use((req: Request, res: Response, next: NextFunction) => {
-//    next(createError(404));
-// });
-
-/**
- * error handler
- */
-// app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-//    // set locals, only providing error in development
-//    res.locals.message = err.message;
-//    res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-//    // render the error page
-//    res.status(err.status || 500);
-//    res.render('error');
-// });
-
-// module.exports = app;
 
 /**
  * @Description Get the corresponding color for every route depending on the method
@@ -96,5 +82,5 @@ const getColor = (method: string) => {
   return color + method.toUpperCase();
 };
 
-setDirectory(path.join(__dirname, 'temp'));
+setDirectory(path.join(distParent, 'temp'));
 export default app;

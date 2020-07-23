@@ -8,7 +8,6 @@ import {
   getLocalPage,
   makeFileReg,
 } from '../../util/util';
-import { SIGSEGV } from 'constants';
 
 /* Defines whether or not the data base is being updated */
 export let updating: boolean = false;
@@ -29,6 +28,12 @@ export const initializeServer = (): void => {
   /* Initialy updating is set to true */
   updating = true;
 
+  if (!fs.existsSync(cwd)){
+    fs.mkdirSync(cwd);
+  }
+  if (!fs.existsSync(path.join(cwd, '.gitignore'))){
+    fs.writeFileSync(path.join(cwd, '.gitignore'), '');
+  }
   /* The files that are currently active in the folder */
   const files = loadFiles(cwd);
 

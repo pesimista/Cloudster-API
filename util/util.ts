@@ -5,8 +5,8 @@ import sqliteSync from 'sqlite-sync';
 import { IResult } from '../models/result';
 import { IUser } from '../models/user';
 import path from 'path';
-
-const connection = sqliteSync.connect(path.join(__dirname, '..', 'cloudster.db'));
+import { distParent } from '../app';
+const connection = sqliteSync.connect(path.join(distParent, 'cloudster.db'));
 
 export const connSync = {
   run: (query: string, args?: any[]): IResult => {
