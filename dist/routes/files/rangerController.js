@@ -21,6 +21,12 @@ const exclude = [
 exports.initializeServer = () => {
     /* Initialy updating is set to true */
     exports.updating = true;
+    if (!fs_1.default.existsSync(exports.cwd)) {
+        fs_1.default.mkdirSync(exports.cwd);
+    }
+    if (!fs_1.default.existsSync(path_1.default.join(exports.cwd, '.gitignore'))) {
+        fs_1.default.writeFileSync(path_1.default.join(exports.cwd, '.gitignore'), '');
+    }
     /* The files that are currently active in the folder */
     const files = loadFiles(exports.cwd);
     const rows = util_1.connSync.run(`SELECT ino, name from archivos`);

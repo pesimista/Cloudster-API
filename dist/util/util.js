@@ -15,7 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const sqlite_sync_1 = __importDefault(require("sqlite-sync"));
 const path_1 = __importDefault(require("path"));
-const connection = sqlite_sync_1.default.connect(path_1.default.join(__dirname, '..', '..', 'cloudster.db'));
+const app_1 = require("../app");
+const connection = sqlite_sync_1.default.connect(path_1.default.join(app_1.distParent, 'cloudster.db'));
 exports.connSync = {
     run: (query, args) => {
         var _a;

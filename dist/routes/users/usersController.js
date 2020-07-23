@@ -34,7 +34,7 @@ exports.getUsers = (req, res, sendRes = true) => {
     const where = id ? ` WHERE id='${id}';` : ';';
     const result = util_1.connSync.run(query + where);
     if (result.error) {
-        res.status(500).json(Object.assign({}, result.error));
+        res.status(500).json({ message: result.error });
         return [];
     }
     if (!sendRes) {
@@ -68,7 +68,7 @@ exports.checkUser = (req, res) => {
   `;
     const result = util_1.connSync.run(query);
     if (result.error) {
-        res.status(500).json(Object.assign({}, result.error));
+        res.status(500).json({ message: result.error });
         return;
     }
     else if (!result[0]) {
@@ -183,13 +183,17 @@ exports.register = (req, res) => {
         return;
     }
     /* Llegados a este punto se asume que tiene todos los campos */
-    let [row] = util_1.connSync.run(`
+    const userExists = util_1.connSync.run(`
       SELECT 1 FROM
          usuarios
       WHERE
          usuario='${body.usuario.replace(/\'/g, "''")}'
       `);
-    if (!row) {
+    if (userExists.error) {
+        res.status(500).json({ error: userExists.error });
+        return;
+    }
+    if (userExists[0]) {
         res.status(400).json({ code: 6, message: `El nombre de usuario ya existe` });
         return;
     }
@@ -212,7 +216,7 @@ exports.register = (req, res) => {
       '${id}',
       '${body.nombre.replace(/\'/g, "''")}',
       '${body.apellido.replace(/\'/g, "''")}',
-      '${body.password.replace(/\'/g, "''")}',
+      '${body.password}',
       date(),
       '${body.usuario.replace(/\'/g, "''")}',
       ${body.pregunta1},
@@ -220,13 +224,13 @@ exports.register = (req, res) => {
       '${body.respuesta1.replace(/\'/g, "''")}',
       '${body.respuesta2.replace(/\'/g, "''")}',
       1,
-      0,
+      0
     )`);
     if (result.error) {
         res.status(500).json(Object.assign({}, result.error));
         return;
     }
-    [row] = util_1.connSync.run(`
+    const [row] = util_1.connSync.run(`
     SELECT * FROM
       usuarios
     WHERE
@@ -234,7 +238,7 @@ exports.register = (req, res) => {
     `);
     util_1.makeUserReg(row.id, '', 'register');
     res.status(200).json({
-        message: `Registrado satisfactoriamente. Contacta a un administrados para que active tu cuenta.`,
+        message: `Registrado satisfactoriamente. Contacta a un administrador para que active tu cuenta.`,
     });
 };
 /**
@@ -285,7 +289,7 @@ exports.updateUserData = (req, res) => {
     /* runs the update query  */
     const result = util_1.connSync.run(query);
     if (result.error) {
-        res.status(500).json(Object.assign({}, result.error));
+        res.status(500).json({ message: result.error });
         return;
     }
     let regQuery = `
@@ -343,7 +347,7 @@ exports.deleteUser = (req, res) => {
       \`id\`='${req.params.id}';`;
     const result = util_1.connSync.run(query);
     if (result.error) {
-        res.status(500).json(Object.assign({}, result));
+        res.status(500).json({ message: result.error });
         return;
     }
     res.status(200).json({ message: 'oll korrect' });
@@ -419,7 +423,7 @@ exports.checkUserQuestions = (req, res) => {
     const query = `SELECT * FROM usuarios WHERE id='${id}' COLLATE NOCASE;`;
     const rows = util_1.connSync.run(query);
     if (rows.error) {
-        res.status(500).json(rows.error);
+        res.status(500).json({ message: rows.error });
         return;
     }
     const [row] = rows;

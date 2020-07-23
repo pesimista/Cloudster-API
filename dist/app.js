@@ -3,6 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const path_1 = __importDefault(require("path"));
+exports.distParent = path_1.default.dirname(__dirname);
+// export const distParent = __dirname;
 const compression_1 = __importDefault(require("compression"));
 const express_1 = __importDefault(require("express"));
 const helmet_1 = __importDefault(require("helmet"));
@@ -13,7 +16,6 @@ const adminRoute_1 = __importDefault(require("./routes/admin/adminRoute"));
 const index_route_1 = __importDefault(require("./routes/index.route"));
 const usersController_1 = require("./routes/users/usersController");
 const usersRoute_1 = __importDefault(require("./routes/users/usersRoute"));
-const path_1 = __importDefault(require("path"));
 /* Instantiate app */
 const app = express_1.default();
 /* Compresses all routes */
@@ -47,28 +49,12 @@ app.get('/api/questions', usersController_1.getQuestions);
 app.use('/api/files', rangerRoute_1.default);
 app.use('/api/admin', adminRoute_1.default);
 app.use('/api', index_route_1.default);
-app.use('/', (req, res, next) => {
-    res.send('AYUDAMEDIOS');
+app.use('/api', index_route_1.default);
+app.use(express_1.default.static(exports.distParent));
+app.use(express_1.default.static(path_1.default.join(exports.distParent, 'build')));
+app.get('/*', (req, res) => {
+    res.sendFile(path_1.default.join(exports.distParent, 'build', 'index.html'));
 });
-app.use('/*', (req, res) => {
-    res.status(404).send();
-});
-// // catch 404 and forward to error handler
-// app.use((req: Request, res: Response, next: NextFunction) => {
-//    next(createError(404));
-// });
-/**
- * error handler
- */
-// app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-//    // set locals, only providing error in development
-//    res.locals.message = err.message;
-//    res.locals.error = req.app.get('env') === 'development' ? err : {};
-//    // render the error page
-//    res.status(err.status || 500);
-//    res.render('error');
-// });
-// module.exports = app;
 /**
  * @Description Get the corresponding color for every route depending on the method
  * @param method Method
@@ -86,6 +72,6 @@ const getColor = (method) => {
                     : '\x1b[35m';
     return color + method.toUpperCase();
 };
-rangerController_1.setDirectory(path_1.default.join(__dirname, 'temp'));
+rangerController_1.setDirectory(path_1.default.join(exports.distParent, 'temp'));
 exports.default = app;
 //# sourceMappingURL=app.js.map
