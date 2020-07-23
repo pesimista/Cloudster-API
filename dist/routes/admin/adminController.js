@@ -12,7 +12,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getLogReport = exports.getGenericReport = exports.generateFileReport = exports.getFilesDetails = exports.getUsersDetails = exports.getUsers = exports.getFiles = void 0;
 const util_1 = require("../../util/util");
 const rangerController_1 = require("../files/rangerController");
 const puppeteer_1 = __importDefault(require("puppeteer"));
@@ -99,7 +98,11 @@ exports.getFilesDetails = (req, res) => {
     res.status(200).json(Object.assign(Object.assign({}, details), { actions: result.actions, parsedSize }));
 };
 exports.generateFileReport = (req, res) => {
-    const { username = 'Yo' } = util_1.getTokenKey(req.headers.authorization);
+    const { username = '' } = util_1.getTokenKey(req.headers.authorization);
+    if (!username) {
+        res.status(401).json({ message: 'No token' });
+        return;
+    }
     const query = `SELECT
     \`ino\`,
     \`name\`,
@@ -137,7 +140,11 @@ exports.generateFileReport = (req, res) => {
     compile('template.hbs', mappedFiles, username, callback);
 };
 exports.getGenericReport = (req, res) => {
-    const { username = 'Yo' } = util_1.getTokenKey(req.headers.authorization);
+    const { username = '' } = util_1.getTokenKey(req.headers.authorization);
+    if (!username) {
+        res.status(401).json({ message: 'No token' });
+        return;
+    }
     const { accion = 'read' } = req.params;
     const query = `
     SELECT
@@ -220,7 +227,8 @@ exports.getLogReport = (req, res) => {
 };
 const compile = (template, data, username, cb) => {
     const today = new Date().toLocaleString('es-VE');
-    const templatePath = path_1.default.join(__dirname, 'templates', template);
+    const root = path_1.default.dirname(path_1.default.dirname(__dirname));
+    const templatePath = path_1.default.join(root, 'templates', template);
     const html = fs_1.default.readFileSync(templatePath, 'UTF-8');
     const report = handlebars_1.default.compile(html)({
         username,

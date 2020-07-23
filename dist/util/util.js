@@ -12,13 +12,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.makeUserReg = exports.makeFileReg = exports.getLocalPage = exports.randomUpper = exports.getTokenKey = exports.AdminAuth = exports.Authorization = exports.connSync = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const sqlite_sync_1 = __importDefault(require("sqlite-sync"));
 const path_1 = __importDefault(require("path"));
-const connection = sqlite_sync_1.default.connect(
-    path_1.default.join(__dirname, '..', 'cloudster.db')
-);
+const connection = sqlite_sync_1.default.connect(path_1.default.join(__dirname, '..', 'cloudster.db'));
 exports.connSync = {
     run: (query, args) => {
         var _a;

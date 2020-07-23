@@ -1,28 +1,15 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getFilesByUser = exports.checkUserQuestions = exports.getUserQuestions = exports.getQuestions = exports.deleteUser = exports.updateUserData = exports.register = exports.login = exports.checkUser = exports.getUsers = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const crypto_1 = __importStar(require("crypto"));
 const util_1 = require("../../util/util");
@@ -172,27 +159,27 @@ exports.register = (req, res) => {
     /* Validar que tenga todos los campos */
     if (!body.usuario) {
         /* BadRequest */
-        res.status(400).send(`Falta Usuario!`);
+        res.status(400).json({ code: 1, message: `Falta Usuario!` });
         return;
     }
     else if (!body.nombre) {
         /* BadRequest */
-        res.status(400).send(`Falta nombre!`);
+        res.status(400).json({ code: 2, message: `Falta nombre!` });
         return;
     }
     else if (!body.password) {
         /* BadRequest */
-        res.status(400).send(`Falta contraseña`);
+        res.status(400).json({ code: 3, message: `Falta contraseña` });
         return;
     }
     else if (!body.pregunta1 || !body.pregunta2) {
         /* BadRequest */
-        res.status(400).send(`Falta pregunta secreta`);
+        res.status(400).json({ code: 4, message: `Falta pregunta secreta` });
         return;
     }
     else if (!body.respuesta1 || !body.respuesta2) {
         /* BadRequest */
-        res.status(400).send(`Falta respuesta a la pregunta secreta`);
+        res.status(400).json({ code: 5, message: `Falta respuesta a la pregunta secreta` });
         return;
     }
     /* Llegados a este punto se asume que tiene todos los campos */
@@ -203,13 +190,10 @@ exports.register = (req, res) => {
          usuario='${body.usuario.replace(/\'/g, "''")}'
       `);
     if (!row) {
-        res.status(400).send(`El nombre de usuario ya existe`);
+        res.status(400).json({ code: 6, message: `El nombre de usuario ya existe` });
         return;
     }
-    const [key, id] = [
-        crypto_1.default.randomBytes(16).toString('hex'),
-        crypto_1.default.randomBytes(16).toString('hex'),
-    ];
+    const id = crypto_1.default.randomBytes(16).toString('hex');
     const result = util_1.connSync.run(`
     INSERT INTO usuarios(
       \`id\`
@@ -224,7 +208,6 @@ exports.register = (req, res) => {
       ,\`respuesta2\`
       ,\`nivel\`
       ,\`active\`
-      ,\`key\`
     ) VALUES(
       '${id}',
       '${body.nombre.replace(/\'/g, "''")}',
@@ -237,8 +220,7 @@ exports.register = (req, res) => {
       '${body.respuesta1.replace(/\'/g, "''")}',
       '${body.respuesta2.replace(/\'/g, "''")}',
       1,
-      1,
-      '${key}'
+      0,
     )`);
     if (result.error) {
         res.status(500).json(Object.assign({}, result.error));
@@ -251,10 +233,8 @@ exports.register = (req, res) => {
       usuario='${body.usuario.replace(/\'/g, "''")}'
     `);
     util_1.makeUserReg(row.id, '', 'register');
-    res.status(200).send({
-        response: `Grant access`,
-        token: hashToken(row, key),
-        user: Object.assign(Object.assign({}, row), { respuesta2: undefined, respuesta1: undefined, password: undefined, intentos: undefined }),
+    res.status(200).json({
+        message: `Registrado satisfactoriamente. Contacta a un administrados para que active tu cuenta.`,
     });
 };
 /**
