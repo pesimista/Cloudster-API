@@ -9,7 +9,6 @@ import {
   postFile,
   postFolder,
   putFile,
-  viewFile,
   removeFile,
   moveFile,
 } from './rangerController';
@@ -21,7 +20,6 @@ const upload = multer({ dest: 'temp/' });
 /* GET files listing. */
 ranger.get('/', Authorization, getFilesInDirectory);
 ranger.get('/:ino', Authorization, getFileInfo);
-ranger.get('/:ino/watch', Authorization, viewFile);
 ranger.get('/:ino/download', Authorization, downloadFile);
 ranger.get('/:ino/files', Authorization, getFilesInDirectory);
 ranger.get('/:ino/peers', Authorization, getFilesInDirectory);

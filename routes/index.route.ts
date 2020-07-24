@@ -13,6 +13,10 @@ router.get('/:page', (req: Request, res: Response, next: NextFunction) => {
   if (existsSync(url)) res.status(200).sendFile(url);
   else res.status(404).sendFile(path.join(dir, 'pages', 'notFound.html'));
 });
+router.get('/', (req: Request, res: Response, next: NextFunction) => {
+  const dir = path.dirname(__dirname);
+  res.status(404).sendFile(path.join(dir, 'pages', 'notFound.html'));
+});
 
 // module.exports = router;
 export default router;

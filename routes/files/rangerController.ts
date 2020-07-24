@@ -459,8 +459,8 @@ export const postFile = (req: Request, res: Response): void => {
   const folder = findFile(ino);
 
   const baseDir = ino !== 0 ? getFileFullPath(folder) : cwd;
-
-  const final = setNewName(req.file.originalname, ino);
+  const origin = req.body.name || req.file.originalname;
+  const final = setNewName(origin, ino);
   const newName: string = path.join(baseDir, final);
 
   try {
@@ -818,13 +818,15 @@ const verifyPermission = (
     req.headers.authorization || 'bearer ' + req.query.token
   );
 
+  const ino = req.params.ino || req.query.ino;
+
   const [user] = (connSync.run(
     `SELECT * FROM usuarios WHERE key='${key}' COLLATE NOCASE`
   ) as unknown) as IFile[];
 
-  if (!req.params.ino) return [user.nivel, { ino: 0 }, user];
+  if (!ino) return [user.nivel, { ino: 0 }, user];
 
-  const file = findFile(req.params.ino);
+  const file = findFile(ino);
 
   if (!file) {
     if (sendRes) res.status(404).send({ response: 'file not found' });
