@@ -13,7 +13,6 @@ const upload = multer_1.default({ dest: 'temp/' });
 /* GET files listing. */
 ranger.get('/', util_1.Authorization, rangerController_1.getFilesInDirectory);
 ranger.get('/:ino', util_1.Authorization, rangerController_1.getFileInfo);
-ranger.get('/:ino/watch', util_1.Authorization, rangerController_1.viewFile);
 ranger.get('/:ino/download', util_1.Authorization, rangerController_1.downloadFile);
 ranger.get('/:ino/files', util_1.Authorization, rangerController_1.getFilesInDirectory);
 ranger.get('/:ino/peers', util_1.Authorization, rangerController_1.getFilesInDirectory);

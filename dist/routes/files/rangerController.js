@@ -392,7 +392,8 @@ exports.postFile = (req, res) => {
     }
     const folder = exports.findFile(ino);
     const baseDir = ino !== 0 ? exports.getFileFullPath(folder) : exports.cwd;
-    const final = setNewName(req.file.originalname, ino);
+    const origin = req.body.name || req.file.originalname;
+    const final = setNewName(origin, ino);
     const newName = path_1.default.join(baseDir, final);
     try {
         fs_1.default.renameSync(req.file.path, newName);
@@ -682,10 +683,11 @@ exports.setDirectory = (dir) => {
  */
 const verifyPermission = (req, res, sendRes = true) => {
     const { key } = util_1.getTokenKey(req.headers.authorization || 'bearer ' + req.query.token);
+    const ino = req.params.ino || req.query.ino;
     const [user] = util_1.connSync.run(`SELECT * FROM usuarios WHERE key='${key}' COLLATE NOCASE`);
-    if (!req.params.ino)
+    if (!ino)
         return [user.nivel, { ino: 0 }, user];
-    const file = exports.findFile(req.params.ino);
+    const file = exports.findFile(ino);
     if (!file) {
         if (sendRes)
             res.status(404).send({ response: 'file not found' });

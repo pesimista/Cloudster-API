@@ -17,6 +17,10 @@ router.get('/:page', (req, res, next) => {
     else
         res.status(404).sendFile(path_1.default.join(dir, 'pages', 'notFound.html'));
 });
+router.get('/', (req, res, next) => {
+    const dir = path_1.default.dirname(__dirname);
+    res.status(404).sendFile(path_1.default.join(dir, 'pages', 'notFound.html'));
+});
 // module.exports = router;
 exports.default = router;
 //# sourceMappingURL=index.route.js.map

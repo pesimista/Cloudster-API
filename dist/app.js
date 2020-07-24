@@ -16,6 +16,7 @@ const adminRoute_1 = __importDefault(require("./routes/admin/adminRoute"));
 const index_route_1 = __importDefault(require("./routes/index.route"));
 const usersController_1 = require("./routes/users/usersController");
 const usersRoute_1 = __importDefault(require("./routes/users/usersRoute"));
+const util_1 = require("./util/util");
 /* Instantiate app */
 const app = express_1.default();
 /* Compresses all routes */
@@ -49,11 +50,17 @@ app.get('/api/questions', usersController_1.getQuestions);
 app.use('/api/files', rangerRoute_1.default);
 app.use('/api/admin', adminRoute_1.default);
 app.use('/api', index_route_1.default);
-app.use('/api', index_route_1.default);
-app.use(express_1.default.static(exports.distParent));
-app.use(express_1.default.static(path_1.default.join(exports.distParent, 'build')));
-app.get('/', (req, res) => {
-    res.sendFile(path_1.default.join(exports.distParent, 'build', 'index.html'));
+app.get('/api/watch/:ino', util_1.Authorization, rangerController_1.viewFile);
+const react = express_1.default.Router();
+react.use(express_1.default.static(path_1.default.join(__dirname)));
+react.use(express_1.default.static(path_1.default.join(__dirname, 'build')));
+react.get('*', (req, res) => {
+    res.sendFile(path_1.default.join(__dirname + 'build', 'index.html'));
+});
+app.use('/app', react);
+app.get(['/:route', '/'], (req, res) => {
+    res.redirect('/app');
+    return;
 });
 /**
  * @Description Get the corresponding color for every route depending on the method
