@@ -98,10 +98,20 @@ exports.getFilesDetails = (req, res) => {
     res.status(200).json(Object.assign(Object.assign({}, details), { actions: result.actions, parsedSize }));
 };
 exports.generateFileReport = (req, res) => {
-    const { username = '' } = util_1.getTokenKey(req.headers.authorization);
-    if (!username) {
-        res.status(401).json({ message: 'No token' });
-        return;
+    const token = util_1.getTokenKey(req.headers.authorization);
+    if (!token.usuario) {
+        const userResult = util_1.connSync.run(`
+      SELECT usuario FROM usuarios WHERE key='${token.key}'
+    `);
+        if (userResult.error) {
+            res.status(500).json({ code: 'SQLite', message: userResult.error });
+            return;
+        }
+        if (!userResult[0]) {
+            res.status(401).json({ message: 'No token' });
+            return;
+        }
+        token.usuario = userResult[0].usuario;
     }
     const query = `SELECT
     \`ino\`,
@@ -124,7 +134,7 @@ exports.generateFileReport = (req, res) => {
   `;
     const result = util_1.connSync.run(query);
     if (result.error) {
-        res.status(500).json(Object.assign({}, result.error));
+        res.status(500).json({ code: 'SQLite', message: result.error });
         return;
     }
     const mappedFiles = result.map((file) => (Object.assign(Object.assign({}, file), { birthtime: new Date(file.birthtime).toLocaleString('es-VE'), lastModified: file.lastModified
@@ -137,13 +147,26 @@ exports.generateFileReport = (req, res) => {
         });
         res.send(pdf);
     };
-    compile('template.hbs', mappedFiles, username, callback);
+    const onError = (message) => {
+        res.status(500).json({ code: 'puppeteer', message });
+    };
+    compile('template.hbs', mappedFiles, token.username, callback, onError);
 };
 exports.getGenericReport = (req, res) => {
-    const { username = '' } = util_1.getTokenKey(req.headers.authorization);
-    if (!username) {
-        res.status(401).json({ message: 'No token' });
-        return;
+    const token = util_1.getTokenKey(req.headers.authorization);
+    if (!token.usuario) {
+        const userResult = util_1.connSync.run(`
+      SELECT usuario FROM usuarios WHERE key='${token.key}'
+    `);
+        if (userResult.error) {
+            res.status(500).json({ code: 'SQLite', message: userResult.error });
+            return;
+        }
+        if (!userResult[0]) {
+            res.status(401).json({ message: 'No token' });
+            return;
+        }
+        token.usuario = userResult[0].usuario;
     }
     const { accion = 'read' } = req.params;
     const query = `
@@ -167,7 +190,7 @@ exports.getGenericReport = (req, res) => {
   `;
     const result = util_1.connSync.run(query);
     if (result.error) {
-        res.status(500).json(Object.assign({}, result.error));
+        res.status(500).json({ code: 'SQLite', message: result.error });
         return;
     }
     const mappedFiles = result.map((row) => (Object.assign(Object.assign({}, row), { fecha: new Date(row.fecha).toLocaleString('es-VE') })));
@@ -178,20 +201,41 @@ exports.getGenericReport = (req, res) => {
         });
         res.send(pdf);
     };
-    compile('downloads.hbs', mappedFiles, username, callback);
+    const onError = (message) => {
+        res.status(500).json({ code: 'puppeteer', message });
+    };
+    compile('downloads.hbs', mappedFiles, token.username, callback, onError);
 };
 exports.getLogReport = (req, res) => {
-    const { username = 'Yo' } = util_1.getTokenKey(req.headers.authorization);
+    const token = util_1.getTokenKey(req.headers.authorization);
+    if (!token.usuario) {
+        const userResult = util_1.connSync.run(`
+      SELECT usuario FROM usuarios WHERE key='${token.key}'
+    `);
+        if (userResult.error) {
+            res.status(500).json({ code: 'SQLite', message: userResult.error });
+            return;
+        }
+        if (!userResult[0]) {
+            res.status(401).json({ message: 'No token' });
+            return;
+        }
+        token.usuario = userResult[0].usuario;
+    }
     const query = `
     SELECT
       A.fecha,
-      A.performedBy,
+      SUBSTR(A.performedBy, -5) as performedBy,
       IFNULL(B.\`usuario\`, A.\`performedBy\`) as username,
       A.accion,
-      A.campo
+      CASE
+        WHEN A.campo='inactive' THEN 'Negado - Inactivo'
+        WHEN A.campo='fail' THEN 'Negado - Contraseña incorrecta'
+        ELSE 'Otorgado'
+      END as result
     FROM
       \`registros\` as A
-    INNEr JOIN
+    INNER JOIN
       \`usuarios\` as B
     ON
       A.\`performedBy\` = B.\`id\`
@@ -205,17 +249,7 @@ exports.getLogReport = (req, res) => {
         res.status(500).json(Object.assign({}, result.error));
         return;
     }
-    const getStatus = (campo) => {
-        switch (campo) {
-            case 'inactive':
-                return { result: 'Negado - Inactivo' };
-            case 'fail':
-                return { result: 'Negado - Contraseña incorrecta' };
-            default:
-                return { result: 'Otorgado' };
-        }
-    };
-    const mappedFiles = result.map((row) => (Object.assign(Object.assign(Object.assign({}, row), getStatus(row.campo)), { performedBy: row.performedBy.slice(-5), fecha: new Date(row.fecha).toLocaleString('es-VE') })));
+    const mappedFiles = result.map((row) => (Object.assign(Object.assign({}, row), { fecha: new Date(row.fecha).toLocaleString('es-VE') })));
     const callback = (pdf) => {
         res.set({
             'Content-Type': 'application/pdf',
@@ -223,9 +257,12 @@ exports.getLogReport = (req, res) => {
         });
         res.send(pdf);
     };
-    compile('logs.hbs', mappedFiles, username, callback);
+    const onError = (message) => {
+        res.status(500).json({ code: 'puppeteer', message });
+    };
+    compile('logs.hbs', mappedFiles, token.usuario, callback, onError);
 };
-const compile = (template, data, username, cb) => {
+const compile = (template, data, username, cb, onError) => {
     const today = new Date().toLocaleString('es-VE');
     const root = path_1.default.dirname(path_1.default.dirname(__dirname));
     const templatePath = path_1.default.join(root, 'templates', template);
@@ -235,25 +272,30 @@ const compile = (template, data, username, cb) => {
         date: today,
         data,
     });
-    printPDF(report, cb);
+    printPDF(report, cb, onError);
 };
-const printPDF = (content, cb) => __awaiter(void 0, void 0, void 0, function* () {
-    const browser = yield puppeteer_1.default.launch({ headless: true });
-    const page = yield browser.newPage();
-    yield page.setContent(content);
-    yield page.emulateMediaType('screen');
-    const pdf = yield page.pdf({
-        format: 'Letter',
-        background: true,
-        margin: {
-            top: '2cm',
-            bottom: '1cm',
-            left: '1cm',
-            right: '1cm',
-        },
-    });
-    yield browser.close();
-    // return pdf;
-    cb(pdf);
+const printPDF = (content, cb, onError) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const browser = yield puppeteer_1.default.launch({ headless: true });
+        const page = yield browser.newPage();
+        yield page.setContent(content);
+        yield page.emulateMediaType('screen');
+        const pdf = yield page.pdf({
+            format: 'Letter',
+            background: true,
+            margin: {
+                top: '2cm',
+                bottom: '1cm',
+                left: '1cm',
+                right: '1cm',
+            },
+        });
+        yield browser.close();
+        // return pdf;
+        cb(pdf);
+    }
+    catch (e) {
+        onError === null || onError === void 0 ? void 0 : onError(e.message);
+    }
 });
 //# sourceMappingURL=adminController.js.map
