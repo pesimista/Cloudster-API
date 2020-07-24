@@ -52,10 +52,10 @@ app.use('/api/admin', adminRoute_1.default);
 app.use('/api', index_route_1.default);
 app.get('/api/watch/:ino', util_1.Authorization, rangerController_1.viewFile);
 const react = express_1.default.Router();
-react.use(express_1.default.static(path_1.default.join(__dirname)));
-react.use(express_1.default.static(path_1.default.join(__dirname, 'build')));
+react.use(express_1.default.static(path_1.default.join(exports.distParent)));
+react.use(express_1.default.static(path_1.default.join(exports.distParent, 'build')));
 react.get('*', (req, res) => {
-    res.sendFile(path_1.default.join(__dirname + 'build', 'index.html'));
+    res.sendFile(path_1.default.join(exports.distParent + 'build', 'index.html'));
 });
 app.use('/app', react);
 app.get(['/:route', '/'], (req, res) => {
