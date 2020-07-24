@@ -60,10 +60,10 @@ app.get('/api/watch/:ino', Authorization, viewFile);
 
 const react = express.Router();
 
-react.use(express.static(path.join(__dirname)));
-react.use(express.static(path.join(__dirname, 'build')));
+react.use(express.static(distParent));
+react.use(express.static(path.join(distParent, 'build')));
 react.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname + 'build', 'index.html'));
+  res.sendFile(path.join(distParent, 'build', 'index.html'));
 });
 app.use('/app', react)
 app.get(['/:route', '/'], (req: Request, res: Response) => {

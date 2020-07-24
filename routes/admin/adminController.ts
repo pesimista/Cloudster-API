@@ -124,10 +124,20 @@ export const getFilesDetails = (req: Request, res: Response): void => {
 };
 
 export const generateFileReport = (req: Request, res: Response) => {
-  const { username = '' } = getTokenKey(req.headers.authorization);
-  if (!username) {
-    res.status(401).json({message: 'No token'});
-    return;
+  const token = getTokenKey(req.headers.authorization);
+  if (!token.usuario){
+    const userResult = connSync.run(`
+      SELECT usuario FROM usuarios WHERE key='${token.key}'
+    `);
+    if (userResult.error) {
+      res.status(500).json({code: 'SQLite', message: userResult.error});
+      return;
+    }
+    if (!userResult[0]) {
+      res.status(401).json({message: 'No token'});
+      return;
+    }
+    token.usuario = userResult[0].usuario;
   }
 
   const query = `SELECT
@@ -151,7 +161,7 @@ export const generateFileReport = (req: Request, res: Response) => {
   `;
   const result = connSync.run(query);
   if (result.error) {
-    res.status(500).json({ ...result.error });
+    res.status(500).json({code: 'SQLite', message: result.error});
     return;
   }
 
@@ -170,15 +180,28 @@ export const generateFileReport = (req: Request, res: Response) => {
     });
     res.send(pdf);
   };
+  const onError = (message: string) => {
+    res.status(500).json({code: 'puppeteer', message});
+  }
 
-  compile('template.hbs', mappedFiles, username, callback);
+  compile('template.hbs', mappedFiles, token.username, callback, onError);
 };
 
 export const getGenericReport = (req: Request, res: Response) => {
-  const { username = '' } = getTokenKey(req.headers.authorization);
-  if (!username) {
-    res.status(401).json({message: 'No token'});
-    return;
+  const token = getTokenKey(req.headers.authorization);
+  if (!token.usuario){
+    const userResult = connSync.run(`
+      SELECT usuario FROM usuarios WHERE key='${token.key}'
+    `);
+    if (userResult.error) {
+      res.status(500).json({code: 'SQLite', message: userResult.error});
+      return;
+    }
+    if (!userResult[0]) {
+      res.status(401).json({message: 'No token'});
+      return;
+    }
+    token.usuario = userResult[0].usuario;
   }
   const { accion = 'read' } = req.params;
 
@@ -203,7 +226,7 @@ export const getGenericReport = (req: Request, res: Response) => {
   `;
   const result = connSync.run(query);
   if (result.error) {
-    res.status(500).json({ ...result.error });
+    res.status(500).json({ code:'SQLite', message: result.error });
     return;
   }
 
@@ -219,23 +242,44 @@ export const getGenericReport = (req: Request, res: Response) => {
     });
     res.send(pdf);
   };
+  const onError = (message: string) => {
+    res.status(500).json({code: 'puppeteer', message});
+  }
 
-  compile('downloads.hbs', mappedFiles, username, callback);
+  compile('downloads.hbs', mappedFiles, token.username, callback, onError);
 };
 
 export const getLogReport = (req: Request, res: Response) => {
-  const { username = 'Yo' } = getTokenKey(req.headers.authorization);
+  const token = getTokenKey(req.headers.authorization);
+  if (!token.usuario){
+    const userResult = connSync.run(`
+      SELECT usuario FROM usuarios WHERE key='${token.key}'
+    `);
+    if (userResult.error) {
+      res.status(500).json({code: 'SQLite', message: userResult.error});
+      return;
+    }
+    if (!userResult[0]) {
+      res.status(401).json({message: 'No token'});
+      return;
+    }
+    token.usuario = userResult[0].usuario;
+  }
 
   const query = `
     SELECT
       A.fecha,
-      A.performedBy,
+      SUBSTR(A.performedBy, -5) as performedBy,
       IFNULL(B.\`usuario\`, A.\`performedBy\`) as username,
       A.accion,
-      A.campo
+      CASE
+        WHEN A.campo='inactive' THEN 'Negado - Inactivo'
+        WHEN A.campo='fail' THEN 'Negado - Contraseña incorrecta'
+        ELSE 'Otorgado'
+      END as result
     FROM
       \`registros\` as A
-    INNEr JOIN
+    INNER JOIN
       \`usuarios\` as B
     ON
       A.\`performedBy\` = B.\`id\`
@@ -249,38 +293,35 @@ export const getLogReport = (req: Request, res: Response) => {
     res.status(500).json({ ...result.error });
     return;
   }
-  const getStatus = (campo: string): { result: string } => {
-    switch (campo) {
-      case 'inactive':
-        return { result: 'Negado - Inactivo' };
-      case 'fail':
-        return { result: 'Negado - Contraseña incorrecta' };
-      default:
-        return { result: 'Otorgado' };
-    }
-  };
 
   const mappedFiles = result.map(
     (row: LogActivity): LogActivity => ({
       ...row,
-      ...getStatus(row.campo),
-      performedBy: row.performedBy.slice(-5),
       fecha: new Date(row.fecha).toLocaleString('es-VE'),
     })
   );
 
-  const callback = (pdf) => {
+  const callback = (pdf): void => {
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Length': pdf.length,
     });
     res.send(pdf);
   };
+  const onError = (message: string) => {
+    res.status(500).json({code: 'puppeteer', message});
+  }
 
-  compile('logs.hbs', mappedFiles, username, callback);
+  compile('logs.hbs', mappedFiles, token.usuario, callback, onError);
 };
 
-const compile = (template, data, username, cb) => {
+const compile = (
+  template: string,
+  data: any[],
+  username: string,
+  cb: (pdf) => void ,
+  onError?: (val) => void
+) => {
   const today = new Date().toLocaleString('es-VE');
   const root = path.dirname(path.dirname(__dirname));
   const templatePath = path.join(root, 'templates', template);
@@ -292,28 +333,36 @@ const compile = (template, data, username, cb) => {
     data,
   });
 
-  printPDF(report, cb);
+  printPDF(report, cb, onError);
 };
 
-const printPDF = async (content: string, cb: (pdf: any) => void) => {
-  const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
+const printPDF = async (
+  content: string,
+  cb: (pdf) => void,
+  onError?: (val) => void
+) => {
+  try{
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
 
-  await page.setContent(content);
-  await page.emulateMediaType('screen');
-  const pdf = await page.pdf({
-    format: 'Letter',
-    background: true,
-    margin: {
-      top: '2cm',
-      bottom: '1cm',
-      left: '1cm',
-      right: '1cm',
-    },
-  });
-  await browser.close();
-  // return pdf;
-  cb(pdf);
+    await page.setContent(content);
+    await page.emulateMediaType('screen');
+    const pdf = await page.pdf({
+      format: 'Letter',
+      background: true,
+      margin: {
+        top: '2cm',
+        bottom: '1cm',
+        left: '1cm',
+        right: '1cm',
+      },
+    });
+    await browser.close();
+    // return pdf;
+    cb(pdf);
+  } catch(e) {
+    onError?.(e.message);
+  }
 };
 
 interface Details {
