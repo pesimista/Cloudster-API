@@ -349,7 +349,7 @@ exports.downloadFile = (req, res) => {
     WHERE ino=${file.ino};
   `);
     util_1.makeFileReg(usuario.id, file.ino, 'downloaded');
-    res.status(200).download(route);
+    res.status(200).download(route + (file.ext && file.ext!=='~' ? `.${file.ext}` : ''));
 };
 /**
  * A the file
@@ -379,7 +379,7 @@ exports.viewFile = (req, res) => {
     WHERE ino=${file.ino};
   `);
     util_1.makeFileReg(usuario.id, file.ino, 'downloaded');
-    res.status(200).sendFile(route);
+    res.status(200).sendFile(route+(file.ext && file.ext!=='~' ? `.${file.ext}` : ''));
 };
 /**
  * Handles the entire process of uploading a new file to the server
