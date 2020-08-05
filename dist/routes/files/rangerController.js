@@ -136,6 +136,9 @@ const generateFile = (fileName, dir, dep, nivel = 1) => {
         : path_1.default.parse(fileName).ext === ''
             ? '~'
             : path_1.default.parse(fileName).ext.substring(1);
+    if (stat.isFile()) {
+        fileName = path_1.default.parse(fileName).name;
+    }
     const file = {
         ino: stat.ino,
         name: fileName,
@@ -579,6 +582,7 @@ exports.moveFile = (req, res) => {
     if (folder.ino === file.dependency) {
         res.status(200).json({ message: 'Listo' });
     }
+    file.name = path_1.default.parse(file.name).name;
     const newName = setNewName(file.name, folder.ino);
     const oldPath = exports.getFileFullPath(file);
     const newPath = exports.getFileFullPath(Object.assign(Object.assign({}, file), { name: newName, dependency: folder.ino }));
