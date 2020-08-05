@@ -778,16 +778,23 @@ const setNewName = (fileName, ino = 0, isFile = false) => {
     const nombre = path_1.default.parse(fileName).name;
     const exist = (a) => {
         const result = util_1.connSync.run(`
-            SELECT ino FROM archivos WHERE name=? AND ext=? AND dependency=?`, 
-            [a, ext, ino]);
+            SELECT
+                ino
+            FROM
+                archivos
+            WHERE
+                name='${a.replace(/\'/g, "''")}'
+                AND ext='${ext}'
+                AND dependency=${ino}`
+            );
         return result.length;
     };
     let i = 0;
-    let nuevo = `${nombre}${_ext}`;
+    let nuevo = `${nombre}`;
     while (exist(nuevo)) {
-        nuevo = `${nombre}_${++i}${_ext}`;
+        nuevo = `${nombre}_${++i}`;
     }
-    return nuevo;
+    return nuevo + _ext;
 };
 /**
  * Converts the bytes into its correspoding unit in terms of space
