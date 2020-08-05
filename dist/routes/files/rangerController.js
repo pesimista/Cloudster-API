@@ -584,8 +584,8 @@ exports.moveFile = (req, res) => {
     }
     file.name = path_1.default.parse(file.name).name;
     const newName = setNewName(file.name, folder.ino, true);
-    const oldPath = exports.getFileFullPath(file);
-    const newPath = exports.getFileFullPath(Object.assign(Object.assign({}, file), { name: newName, dependency: folder.ino }));
+    const oldPath = exports.getFileFullPath(file) + (file.ext && file.ext!=='~' ? `.${file.ext}` : '');
+    const newPath = exports.getFileFullPath(Object.assign(Object.assign({}, file), { name: newName, dependency: folder.ino })) + (file.ext && file.ext!=='~' ? `.${file.ext}` : '');
     // console.log(oldPath, newPath);
     const result = util_1.connSync.run(`
     UPDATE
