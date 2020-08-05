@@ -396,7 +396,7 @@ exports.postFile = (req, res) => {
     const folder = exports.findFile(ino);
     const baseDir = ino !== 0 ? exports.getFileFullPath(folder) : exports.cwd;
     const origin = req.body.name || req.file.originalname;
-    const final = setNewName(origin, ino);
+    const final = setNewName(origin, ino, true);
     const newName = path_1.default.join(baseDir, final);
     try {
         fs_1.default.renameSync(req.file.path, newName);
@@ -493,7 +493,7 @@ exports.putFile = (req, res) => {
     if (name) {
         const ext = path_1.default.extname(name);
         const originalname = exports.getFileFullPath(file);
-        const final = setNewName(name, ino);
+        const final = setNewName(name, ino, true);
         const parentFolder = path_1.default.dirname(originalname);
         const newName = path_1.default.join(parentFolder, final);
         try {
@@ -583,7 +583,7 @@ exports.moveFile = (req, res) => {
         res.status(200).json({ message: 'Listo' });
     }
     file.name = path_1.default.parse(file.name).name;
-    const newName = setNewName(file.name, folder.ino);
+    const newName = setNewName(file.name, folder.ino, true);
     const oldPath = exports.getFileFullPath(file);
     const newPath = exports.getFileFullPath(Object.assign(Object.assign({}, file), { name: newName, dependency: folder.ino }));
     // console.log(oldPath, newPath);
@@ -772,11 +772,14 @@ exports.findFile = (ino = 0) => {
         return file;
     return Object.assign(Object.assign({}, file), { isFile: Boolean(file.isFile) });
 };
-const setNewName = (fileName, ino = 0) => {
-    const _ext = path_1.default.extname(fileName);
-    const nombre = path_1.default.basename(fileName, _ext);
+const setNewName = (fileName, ino = 0, isFile = false) => {
+    const _ext = path_1.default.parse(fileName).ext;
+    const ext = !isFile ? '' : _ext ? _ext.substring(1) : '~';
+    const nombre = path_1.default.parse(fileName).name;
     const exist = (a) => {
-        const result = util_1.connSync.run(`SELECT ino FROM archivos WHERE name=? AND dependency=?`, [a, ino]);
+        const result = util_1.connSync.run(`
+            SELECT ino FROM archivos WHERE name=? AND ext=? AND dependency=?`, 
+            [a, ext, ino]);
         return result.length;
     };
     let i = 0;
